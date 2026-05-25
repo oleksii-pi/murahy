@@ -15,7 +15,484 @@ const ui = {
   selectionDetail: document.getElementById("selection-detail"),
   actionButtons: document.getElementById("action-buttons"),
   messageLog: document.getElementById("message-log"),
+  languageSelect: document.getElementById("language-select"),
 };
+
+const LANGUAGE_STORAGE_KEY = "murahy-language";
+const SUPPORTED_LANGUAGES = ["en", "de", "uk"];
+const I18N = {
+  en: {
+    languageLabel: "Language",
+    title: "Ant Colony RTS",
+    canvasLabel: "Ant colony strategy game",
+    protein: "Protein",
+    sand: "Sand",
+    sticks: "Sticks",
+    workers: "Workers",
+    guards: "Guards",
+    larvae: "Larvae",
+    queen: "Queen",
+    selection: "Selection",
+    actions: "Actions",
+    alive: "Alive",
+    dead: "Dead",
+    queenAliveCount: "{count} alive",
+    colonyFounded: "Colony founded.",
+    selectedOnScreen: "Selected {count} {label} on screen.",
+    queenMoving: "Queen moving.",
+    movingAnts: "Moving {count} ants.",
+    attackOrder: "Attack order issued.",
+    clickAttackMove: "Click terrain to attack-move.",
+    attackMoving: "{count} ants attack-moving.",
+    workersGathering: "{count} workers gathering {resource}.",
+    workersGatheringMaterials: "{count} workers gathering materials.",
+    workersReturning: "{count} workers returning.",
+    workersGrowingAnthill: "{count} workers growing the anthill.",
+    workersServingQueen: "{count} workers serving the queen.",
+    workersFeedingLarvae: "{count} workers feeding larvae.",
+    selectWorkersTunnel: "Select workers to build a tunnel.",
+    clickTunnelExit: "Click terrain to place the tunnel exit.",
+    tunnelPlacementCancelled: "Tunnel placement cancelled.",
+    tunnelNeeds: "Tunnel needs {cost}.",
+    workersDiggingTunnel: "{count} workers digging a tunnel ({cost}).",
+    workersAddedTunnel: "{count} workers added to the tunnel.",
+    noActiveTunnel: "No active tunnel to join.",
+    tunnelStopped: "Tunnel construction stopped.",
+    ordersCleared: "Orders cleared.",
+    antsAttacking: "{count} ants attacking.",
+    antsDefending: "{count} ants defending the colony.",
+    clickRally: "Click terrain to set the queen rally point.",
+    rallySet: "New ants will rally there.",
+    queenNeedsCell: "Queen needs a prepared cell. Assign workers to serve her.",
+    notEnoughProtein: "Not enough protein.",
+    nurseryFull: "Nursery full ({current}/{capacity}). Grow the anthill with workers.",
+    queenNeedsSpace: "Queen needs open space nearby. Move her inside the anthill.",
+    queenLaidLarva: "Queen laid a {label} larva.",
+    anthillHasQueen: "This anthill already has a queen.",
+    queenAlreadyGrowing: "A queen is already growing here.",
+    newQueenNeeds: "A new queen needs {cost} protein.",
+    newQueenGrowing: "A new queen is growing in this anthill.",
+    anthillExpanded: "Anthill expanded to level {level}.",
+    hatched: "{text}hatched.",
+    newAnthill: "New anthill founded.",
+    enemyAttackPreparing: "Enemy guards are gathering for an attack.",
+    enemyAttackIncoming: "Enemy attack wave incoming.",
+    queenFallen: "Your queen has fallen.",
+    enemyQueenDefeated: "Enemy queen defeated.",
+    rallyCancelled: "Rally placement cancelled.",
+    attackMoveCancelled: "Attack move cancelled.",
+    hillLevel: "Hill L{level}",
+    enemyLevel: "Enemy L{level}",
+    tunnelWorkersProgress: "{progress}% | {workers} workers",
+    victory: "Victory",
+    colonyLost: "Colony Lost",
+    cellSingular: "+1 cell",
+    cellPlural: "+{count} cells",
+    selectIdleWorkers: "Select {count} idle workers",
+    selectedIdleWorkers: "Selected {count} idle workers.",
+    tunnelBuilding: "Tunnel building",
+    tunnelComplete: "Tunnel complete",
+    tunnelProgressDetail: "{progress}% complete | {assigned} assigned | {working} working",
+    costPaid: "Cost paid: {cost}",
+    anthillSummary: "Anthill L{level}",
+    proteinStore: "Protein store: {current}/{capacity}",
+    queenCells: "Queen cells: {count}",
+    queenGrowing: "Queen growing",
+    noQueen: "No queen",
+    zeroUnits: "0 units",
+    enemyQueenStatus: "Enemy queen: {status}",
+    selectedCount: "{count} selected",
+    ordersPrefix: "Orders: {orders}",
+    idleOrders: "Idle or awaiting orders",
+    carrying: "carrying {items}",
+    layCost: "{protein} protein, {cells} cell ({prepared}), nursery {larvae}/{capacity}",
+    noAnthill: "No anthill",
+    tunnelProgressCost: "{progress}%, {workers} workers",
+    actionTunnelBuilding: "Tunnel Building",
+    actionTunnelComplete: "Tunnel Complete",
+    actionCancelTunnel: "Cancel Tunnel",
+    actionRaiseQueen: "Raise New Queen",
+    slowGrowthCost: "{cost} protein, slow growth",
+    actionNoSelection: "No Selection",
+    actionLayWorker: "Lay Worker Larva",
+    actionLayGuard: "Lay Guard Larva",
+    actionSettingRally: "Setting Rally",
+    actionSetRally: "Set Rally Point",
+    costRClick: "R, then click terrain",
+    actionGatherFood: "Gather Food",
+    costProteinSources: "Protein sources",
+    actionGatherMaterials: "Gather Materials",
+    costSandSticks: "Sand and sticks",
+    actionReturn: "Return",
+    costDepositResources: "Deposit resources",
+    actionGrowAnthill: "Grow Anthill",
+    growAnthillCost: "{sand} sand, {sticks} sticks, +{larvae} larvae",
+    actionServeQueen: "Serve Queen",
+    costProteinPerCell: "1 protein per cell",
+    actionFeedLarvae: "Feed Larvae",
+    costConsumesProtein: "Consumes protein",
+    actionPlacingTunnel: "Placing Tunnel",
+    actionBuildTunnel: "Build Tunnel",
+    tunnelScreenCost: "100 protein, 100 sand, 100 sticks per screen",
+    actionJoinTunnel: "Join Tunnel",
+    assigned: "{count} assigned",
+    actionAttackMoveActive: "Attack Move Active",
+    actionAttackMove: "Attack Move",
+    costAClick: "A, then click terrain",
+    actionAttackNearest: "Attack Nearest",
+    costCombatOrder: "Combat order",
+    actionDefend: "Defend",
+    costGuardAnthill: "Guard anthill",
+    actionStop: "Stop",
+    costClearOrders: "Clear orders",
+    resourceProtein: "protein",
+    resourceSand: "sand",
+    resourceSticks: "sticks",
+    orderIdle: "idle",
+    orderMoving: "moving",
+    orderAttackMove: "attack move",
+    orderGathering: "gathering",
+    orderReturning: "returning",
+    orderBuilding: "building",
+    orderFeedingLarvae: "feeding larvae",
+    orderServingQueen: "serving queen",
+    orderDigging: "digging",
+    orderAttacking: "attacking",
+    unitWorkerOne: "worker",
+    unitWorkerMany: "workers",
+    unitGuardOne: "guard",
+    unitGuardMany: "guards",
+    unitQueenOne: "queen",
+    unitQueenMany: "queens",
+  },
+  de: {
+    languageLabel: "Sprache",
+    title: "Ameisenkolonie RTS",
+    canvasLabel: "Ameisenkolonie-Strategiespiel",
+    protein: "Protein",
+    sand: "Sand",
+    sticks: "Stöcke",
+    workers: "Arbeiter",
+    guards: "Wachen",
+    larvae: "Larven",
+    queen: "Königin",
+    selection: "Auswahl",
+    actions: "Aktionen",
+    alive: "Lebt",
+    dead: "Tot",
+    queenAliveCount: "{count} leben",
+    colonyFounded: "Kolonie gegründet.",
+    selectedOnScreen: "{count} {label} auf dem Bildschirm ausgewählt.",
+    queenMoving: "Königin bewegt sich.",
+    movingAnts: "{count} Ameisen bewegen sich.",
+    attackOrder: "Angriffsbefehl erteilt.",
+    clickAttackMove: "Auf Gelände klicken für Angriffsbewegung.",
+    attackMoving: "{count} Ameisen in Angriffsbewegung.",
+    workersGathering: "{count} Arbeiter sammeln {resource}.",
+    workersGatheringMaterials: "{count} Arbeiter sammeln Material.",
+    workersReturning: "{count} Arbeiter kehren zurück.",
+    workersGrowingAnthill: "{count} Arbeiter erweitern den Ameisenhügel.",
+    workersServingQueen: "{count} Arbeiter versorgen die Königin.",
+    workersFeedingLarvae: "{count} Arbeiter füttern Larven.",
+    selectWorkersTunnel: "Wähle Arbeiter zum Tunnelbau.",
+    clickTunnelExit: "Auf Gelände klicken, um den Tunnelausgang zu setzen.",
+    tunnelPlacementCancelled: "Tunnelplatzierung abgebrochen.",
+    tunnelNeeds: "Tunnel braucht {cost}.",
+    workersDiggingTunnel: "{count} Arbeiter graben einen Tunnel ({cost}).",
+    workersAddedTunnel: "{count} Arbeiter zum Tunnel hinzugefügt.",
+    noActiveTunnel: "Kein aktiver Tunnel zum Beitreten.",
+    tunnelStopped: "Tunnelbau gestoppt.",
+    ordersCleared: "Befehle gelöscht.",
+    antsAttacking: "{count} Ameisen greifen an.",
+    antsDefending: "{count} Ameisen verteidigen die Kolonie.",
+    clickRally: "Auf Gelände klicken, um den Sammelpunkt der Königin zu setzen.",
+    rallySet: "Neue Ameisen sammeln sich dort.",
+    queenNeedsCell: "Die Königin braucht eine vorbereitete Zelle. Arbeiter zu ihr schicken.",
+    notEnoughProtein: "Nicht genug Protein.",
+    nurseryFull: "Brutkammer voll ({current}/{capacity}). Ameisenhügel mit Arbeitern erweitern.",
+    queenNeedsSpace: "Die Königin braucht freien Platz in der Nähe. Bewege sie in den Ameisenhügel.",
+    queenLaidLarva: "Königin hat eine {label}-Larve gelegt.",
+    anthillHasQueen: "Dieser Ameisenhügel hat bereits eine Königin.",
+    queenAlreadyGrowing: "Hier wächst bereits eine Königin heran.",
+    newQueenNeeds: "Eine neue Königin braucht {cost} Protein.",
+    newQueenGrowing: "Eine neue Königin wächst in diesem Ameisenhügel.",
+    anthillExpanded: "Ameisenhügel auf Stufe {level} erweitert.",
+    hatched: "{text}geschlüpft.",
+    newAnthill: "Neuer Ameisenhügel gegründet.",
+    enemyAttackPreparing: "Feindliche Wachen sammeln sich für einen Angriff.",
+    enemyAttackIncoming: "Feindliche Angriffswelle naht.",
+    queenFallen: "Deine Königin ist gefallen.",
+    enemyQueenDefeated: "Feindliche Königin besiegt.",
+    rallyCancelled: "Sammelpunktplatzierung abgebrochen.",
+    attackMoveCancelled: "Angriffsbewegung abgebrochen.",
+    hillLevel: "Hügel S{level}",
+    enemyLevel: "Feind S{level}",
+    tunnelWorkersProgress: "{progress}% | {workers} Arbeiter",
+    victory: "Sieg",
+    colonyLost: "Kolonie verloren",
+    cellSingular: "+1 Zelle",
+    cellPlural: "+{count} Zellen",
+    selectIdleWorkers: "{count} untätige Arbeiter wählen",
+    selectedIdleWorkers: "{count} untätige Arbeiter ausgewählt.",
+    tunnelBuilding: "Tunnel im Bau",
+    tunnelComplete: "Tunnel fertig",
+    tunnelProgressDetail: "{progress}% fertig | {assigned} zugeteilt | {working} arbeiten",
+    costPaid: "Bezahlt: {cost}",
+    anthillSummary: "Ameisenhügel S{level}",
+    proteinStore: "Proteinspeicher: {current}/{capacity}",
+    queenCells: "Königinzellen: {count}",
+    queenGrowing: "Königin wächst",
+    noQueen: "Keine Königin",
+    zeroUnits: "0 Einheiten",
+    enemyQueenStatus: "Feindliche Königin: {status}",
+    selectedCount: "{count} ausgewählt",
+    ordersPrefix: "Befehle: {orders}",
+    idleOrders: "Unt. oder wartet auf Befehle",
+    carrying: "trägt {items}",
+    layCost: "{protein} Protein, {cells} Zelle ({prepared}), Brut {larvae}/{capacity}",
+    noAnthill: "Kein Ameisenhügel",
+    tunnelProgressCost: "{progress}%, {workers} Arbeiter",
+    actionTunnelBuilding: "Tunnel im Bau",
+    actionTunnelComplete: "Tunnel fertig",
+    actionCancelTunnel: "Tunnel abbrechen",
+    actionRaiseQueen: "Neue Königin",
+    slowGrowthCost: "{cost} Protein, langsames Wachstum",
+    actionNoSelection: "Keine Auswahl",
+    actionLayWorker: "Arbeiterlarve",
+    actionLayGuard: "Wachlarve",
+    actionSettingRally: "Sammelpunkt setzen",
+    actionSetRally: "Sammelpunkt",
+    costRClick: "R, dann Gelände klicken",
+    actionGatherFood: "Nahrung sammeln",
+    costProteinSources: "Proteinquellen",
+    actionGatherMaterials: "Material sammeln",
+    costSandSticks: "Sand und Stöcke",
+    actionReturn: "Zurück",
+    costDepositResources: "Ressourcen ablegen",
+    actionGrowAnthill: "Hügel erweitern",
+    growAnthillCost: "{sand} Sand, {sticks} Stöcke, +{larvae} Larven",
+    actionServeQueen: "Königin dienen",
+    costProteinPerCell: "1 Protein pro Zelle",
+    actionFeedLarvae: "Larven füttern",
+    costConsumesProtein: "Verbraucht Protein",
+    actionPlacingTunnel: "Tunnel setzen",
+    actionBuildTunnel: "Tunnel bauen",
+    tunnelScreenCost: "100 Protein, 100 Sand, 100 Stöcke pro Bildschirm",
+    actionJoinTunnel: "Tunnel beitreten",
+    assigned: "{count} zugeteilt",
+    actionAttackMoveActive: "Angriffsbewegung aktiv",
+    actionAttackMove: "Angriffsbewegung",
+    costAClick: "A, dann Gelände klicken",
+    actionAttackNearest: "Nächsten angreifen",
+    costCombatOrder: "Kampfbefehl",
+    actionDefend: "Verteidigen",
+    costGuardAnthill: "Ameisenhügel schützen",
+    actionStop: "Stopp",
+    costClearOrders: "Befehle löschen",
+    resourceProtein: "Protein",
+    resourceSand: "Sand",
+    resourceSticks: "Stöcke",
+    orderIdle: "unt.",
+    orderMoving: "bewegt sich",
+    orderAttackMove: "Angriffsbewegung",
+    orderGathering: "sammelt",
+    orderReturning: "kehrt zurück",
+    orderBuilding: "baut",
+    orderFeedingLarvae: "füttert Larven",
+    orderServingQueen: "dient Königin",
+    orderDigging: "gräbt",
+    orderAttacking: "greift an",
+    unitWorkerOne: "Arbeiter",
+    unitWorkerMany: "Arbeiter",
+    unitGuardOne: "Wache",
+    unitGuardMany: "Wachen",
+    unitQueenOne: "Königin",
+    unitQueenMany: "Königinnen",
+  },
+  uk: {
+    languageLabel: "Мова",
+    title: "Мурашина колонія RTS",
+    canvasLabel: "Стратегічна гра про мурашину колонію",
+    protein: "Білок",
+    sand: "Пісок",
+    sticks: "Гілки",
+    workers: "Робітники",
+    guards: "Варта",
+    larvae: "Личинки",
+    queen: "Матка",
+    selection: "Вибір",
+    actions: "Дії",
+    alive: "Жива",
+    dead: "Мертва",
+    queenAliveCount: "{count} живі",
+    colonyFounded: "Колонію засновано.",
+    selectedOnScreen: "Вибрано на екрані: {count} {label}.",
+    queenMoving: "Матка рухається.",
+    movingAnts: "Рухаються мурахи: {count}.",
+    attackOrder: "Наказ атакувати видано.",
+    clickAttackMove: "Клацніть на місцевість для атакувального руху.",
+    attackMoving: "Атакувальний рух: {count} мурах.",
+    workersGathering: "{count} робітників збирають {resource}.",
+    workersGatheringMaterials: "{count} робітників збирають матеріали.",
+    workersReturning: "{count} робітників повертаються.",
+    workersGrowingAnthill: "{count} робітників розширюють мурашник.",
+    workersServingQueen: "{count} робітників обслуговують матку.",
+    workersFeedingLarvae: "{count} робітників годують личинок.",
+    selectWorkersTunnel: "Виберіть робітників для будівництва тунелю.",
+    clickTunnelExit: "Клацніть на місцевість, щоб розмістити вихід тунелю.",
+    tunnelPlacementCancelled: "Розміщення тунелю скасовано.",
+    tunnelNeeds: "Для тунелю потрібно: {cost}.",
+    workersDiggingTunnel: "{count} робітників копають тунель ({cost}).",
+    workersAddedTunnel: "{count} робітників додано до тунелю.",
+    noActiveTunnel: "Немає активного тунелю для приєднання.",
+    tunnelStopped: "Будівництво тунелю зупинено.",
+    ordersCleared: "Накази очищено.",
+    antsAttacking: "{count} мурах атакують.",
+    antsDefending: "{count} мурах захищають колонію.",
+    clickRally: "Клацніть на місцевість, щоб задати точку збору матки.",
+    rallySet: "Нові мурахи збиратимуться там.",
+    queenNeedsCell: "Матці потрібна підготовлена комірка. Призначте робітників її обслуговувати.",
+    notEnoughProtein: "Недостатньо білка.",
+    nurseryFull: "Ясла заповнені ({current}/{capacity}). Розширте мурашник робітниками.",
+    queenNeedsSpace: "Матці потрібен вільний простір поруч. Перемістіть її всередину мурашника.",
+    queenLaidLarva: "Матка відклала личинку: {label}.",
+    anthillHasQueen: "У цьому мурашнику вже є матка.",
+    queenAlreadyGrowing: "Тут уже росте матка.",
+    newQueenNeeds: "Новій матці потрібно {cost} білка.",
+    newQueenGrowing: "Нова матка росте в цьому мурашнику.",
+    anthillExpanded: "Мурашник розширено до рівня {level}.",
+    hatched: "Вилупилися: {text}.",
+    newAnthill: "Новий мурашник засновано.",
+    enemyAttackPreparing: "Ворожа варта збирається для атаки.",
+    enemyAttackIncoming: "Наближається ворожа хвиля атаки.",
+    queenFallen: "Ваша матка загинула.",
+    enemyQueenDefeated: "Ворожу матку переможено.",
+    rallyCancelled: "Розміщення точки збору скасовано.",
+    attackMoveCancelled: "Атакувальний рух скасовано.",
+    hillLevel: "Мурашник Р{level}",
+    enemyLevel: "Ворог Р{level}",
+    tunnelWorkersProgress: "{progress}% | робітників: {workers}",
+    victory: "Перемога",
+    colonyLost: "Колонію втрачено",
+    cellSingular: "+1 комірка",
+    cellPlural: "+{count} комірок",
+    selectIdleWorkers: "Вибрати вільних: {count}",
+    selectedIdleWorkers: "Вибрано вільних робітників: {count}.",
+    tunnelBuilding: "Тунель будується",
+    tunnelComplete: "Тунель готовий",
+    tunnelProgressDetail: "{progress}% готово | призначено: {assigned} | працюють: {working}",
+    costPaid: "Сплачено: {cost}",
+    anthillSummary: "Мурашник Р{level}",
+    proteinStore: "Сховище білка: {current}/{capacity}",
+    queenCells: "Комірки матки: {count}",
+    queenGrowing: "Матка росте",
+    noQueen: "Немає матки",
+    zeroUnits: "0 одиниць",
+    enemyQueenStatus: "Ворожа матка: {status}",
+    selectedCount: "Вибрано: {count}",
+    ordersPrefix: "Накази: {orders}",
+    idleOrders: "Вільні або чекають наказів",
+    carrying: "несе {items}",
+    layCost: "{protein} білка, {cells} комірка ({prepared}), ясла {larvae}/{capacity}",
+    noAnthill: "Немає мурашника",
+    tunnelProgressCost: "{progress}%, робітників: {workers}",
+    actionTunnelBuilding: "Тунель будується",
+    actionTunnelComplete: "Тунель готовий",
+    actionCancelTunnel: "Скасувати тунель",
+    actionRaiseQueen: "Нова матка",
+    slowGrowthCost: "{cost} білка, повільний ріст",
+    actionNoSelection: "Немає вибору",
+    actionLayWorker: "Личинка робітника",
+    actionLayGuard: "Личинка варти",
+    actionSettingRally: "Задання збору",
+    actionSetRally: "Точка збору",
+    costRClick: "R, потім клацніть місцевість",
+    actionGatherFood: "Збирати їжу",
+    costProteinSources: "Джерела білка",
+    actionGatherMaterials: "Збирати матеріали",
+    costSandSticks: "Пісок і гілки",
+    actionReturn: "Повернутись",
+    costDepositResources: "Здати ресурси",
+    actionGrowAnthill: "Розширити мурашник",
+    growAnthillCost: "{sand} піску, {sticks} гілок, +{larvae} личинок",
+    actionServeQueen: "Обслуговувати матку",
+    costProteinPerCell: "1 білок за комірку",
+    actionFeedLarvae: "Годувати личинок",
+    costConsumesProtein: "Споживає білок",
+    actionPlacingTunnel: "Розміщення тунелю",
+    actionBuildTunnel: "Будувати тунель",
+    tunnelScreenCost: "100 білка, 100 піску, 100 гілок за екран",
+    actionJoinTunnel: "До тунелю",
+    assigned: "призначено: {count}",
+    actionAttackMoveActive: "Атак. рух активний",
+    actionAttackMove: "Атакувальний рух",
+    costAClick: "A, потім клацніть місцевість",
+    actionAttackNearest: "Атакувати ближчих",
+    costCombatOrder: "Бойовий наказ",
+    actionDefend: "Захищати",
+    costGuardAnthill: "Охороняти мурашник",
+    actionStop: "Стоп",
+    costClearOrders: "Очистити накази",
+    resourceProtein: "білок",
+    resourceSand: "пісок",
+    resourceSticks: "гілки",
+    orderIdle: "вільні",
+    orderMoving: "рухаються",
+    orderAttackMove: "атакувальний рух",
+    orderGathering: "збирають",
+    orderReturning: "повертаються",
+    orderBuilding: "будують",
+    orderFeedingLarvae: "годують личинок",
+    orderServingQueen: "обслуговують матку",
+    orderDigging: "копають",
+    orderAttacking: "атакують",
+    unitWorkerOne: "робітник",
+    unitWorkerMany: "робітників",
+    unitGuardOne: "вартовий",
+    unitGuardMany: "вартових",
+    unitQueenOne: "матка",
+    unitQueenMany: "маток",
+  },
+};
+
+function initialLanguage() {
+  const saved = window.localStorage?.getItem(LANGUAGE_STORAGE_KEY);
+  if (SUPPORTED_LANGUAGES.includes(saved)) return saved;
+  const browserLanguage = navigator.language.slice(0, 2);
+  return SUPPORTED_LANGUAGES.includes(browserLanguage) ? browserLanguage : "en";
+}
+
+let currentLanguage = initialLanguage();
+
+function t(key, values = {}) {
+  const dictionary = I18N[currentLanguage] || I18N.en;
+  const template = dictionary[key] ?? I18N.en[key] ?? key;
+  return template.replace(/\{(\w+)\}/g, (_, name) => values[name] ?? "");
+}
+
+function applyStaticTranslations() {
+  document.documentElement.lang = currentLanguage;
+  document.querySelectorAll("[data-i18n]").forEach((element) => {
+    element.textContent = t(element.dataset.i18n);
+  });
+  document.title = t("title");
+  canvas.setAttribute("aria-label", t("canvasLabel"));
+}
+
+function setLanguage(language) {
+  if (!SUPPORTED_LANGUAGES.includes(language)) return;
+  currentLanguage = language;
+  window.localStorage?.setItem(LANGUAGE_STORAGE_KEY, language);
+  if (ui.languageSelect) ui.languageSelect.value = language;
+  applyStaticTranslations();
+  if (game.statusMessageKey) {
+    game.statusMessage = t(game.statusMessageKey, game.statusMessageValues);
+  }
+  refreshMessageText();
+  game.actionSignature = "";
+  renderHud();
+  renderActions();
+}
 
 const WORLD = { width: 3200, height: 2200 };
 const VIEW = { width: 1, height: 1, dpr: 1 };
@@ -123,7 +600,11 @@ const game = {
   aiAttackWarningSent: false,
   status: "playing",
   statusMessage: "",
+  statusMessageKey: "",
+  statusMessageValues: {},
   message: "",
+  messageKey: "",
+  messageValues: {},
   messageTimer: 0,
   rallyMode: false,
   tunnelMode: false,
@@ -638,10 +1119,19 @@ function selectedUnits() {
   return units.filter((unit) => selectedIds.has(unit.id) && unit.team === "player" && unit.hp > 0);
 }
 
-function announce(message) {
+function announce(key, values = {}) {
+  const message = t(key, values);
+  game.messageKey = key;
+  game.messageValues = { ...values };
   game.message = message;
   game.messageTimer = 4;
   ui.messageLog.textContent = message;
+}
+
+function refreshMessageText() {
+  if (!game.messageKey || game.messageTimer <= 0) return;
+  game.message = t(game.messageKey, game.messageValues);
+  ui.messageLog.textContent = game.message;
 }
 
 function spawnFloatingText(x, y, text, color) {
@@ -772,7 +1262,7 @@ function setupGame() {
   initialResources();
   game.camera.x = clamp(playerHill.x - VIEW.width * 0.42, 0, WORLD.width - VIEW.width);
   game.camera.y = clamp(playerHill.y - VIEW.height * 0.5, 0, WORLD.height - VIEW.height);
-  announce("Colony founded.");
+  announce("colonyFounded");
 }
 
 function screenToWorld(clientX, clientY) {
@@ -925,8 +1415,8 @@ function selectSameTypeOnScreen(worldX, worldY) {
   }
   updateSelectionFlags();
   renderActions();
-  const label = picked.type === "queen" ? "queen" : `${picked.type}s`;
-  announce(`Selected ${selectedIds.size} ${label} on screen.`);
+  const label = unitTypeLabel(picked.type, selectedIds.size);
+  announce("selectedOnScreen", { count: selectedIds.size, label });
   return true;
 }
 
@@ -981,7 +1471,7 @@ function tunnelCostForDistance(distanceValue) {
 }
 
 function tunnelCostText(cost) {
-  return `${cost.protein} protein, ${cost.sand} sand, ${cost.sticks} sticks`;
+  return `${cost.protein} ${resourceLabel("protein")}, ${cost.sand} ${resourceLabel("sand")}, ${cost.sticks} ${resourceLabel("sticks")}`;
 }
 
 function canPayTunnel(team, cost) {
@@ -1031,7 +1521,11 @@ function commandMove(list, x, y) {
     unit.commandY = point.y;
   });
   if (movable.length) {
-    announce(movable.length === 1 && movable[0].type === "queen" ? "Queen moving." : `Moving ${movable.length} ants.`);
+    if (movable.length === 1 && movable[0].type === "queen") {
+      announce("queenMoving");
+    } else {
+      announce("movingAnts", { count: movable.length });
+    }
   }
 }
 
@@ -1053,7 +1547,7 @@ function commandAttack(list, target) {
   }
   if (attackers.length) {
     addAttackMarker(target.x, target.y, attackers, target.id);
-    announce("Attack order issued.");
+    announce("attackOrder");
   }
 }
 
@@ -1063,7 +1557,7 @@ function commandSetAttackMoveMode() {
   game.attackMoveMode = true;
   game.rallyMode = false;
   game.tunnelMode = false;
-  announce("Click terrain to attack-move.");
+  announce("clickAttackMove");
   renderActions();
 }
 
@@ -1090,7 +1584,7 @@ function commandAttackMove(list, x, y) {
   game.attackMoveMode = false;
   if (attackers.length) {
     addAttackMarker(x, y, attackers);
-    announce(`${attackers.length} ants attack-moving.`);
+    announce("attackMoving", { count: attackers.length });
   }
   renderActions();
 }
@@ -1113,7 +1607,7 @@ function commandGather(list, resource, keepGathering) {
       worker.internalCarry = false;
     }
   }
-  if (workers.length) announce(`${workers.length} workers gathering ${resource.kind}.`);
+  if (workers.length) announce("workersGathering", { count: workers.length, resource: resourceLabel(resource.kind) });
 }
 
 function commandGatherNearest(kind) {
@@ -1138,7 +1632,7 @@ function commandGatherNearest(kind) {
     }
     assigned += 1;
   }
-  if (assigned) announce(`${assigned} workers gathering ${kind}.`);
+  if (assigned) announce("workersGathering", { count: assigned, resource: resourceLabel(kind) });
 }
 
 function commandGatherMaterials() {
@@ -1167,7 +1661,7 @@ function commandGatherMaterials() {
     }
     assigned += 1;
   }
-  if (assigned) announce(`${assigned} workers gathering materials.`);
+  if (assigned) announce("workersGatheringMaterials", { count: assigned });
 }
 
 function commandReturn(list) {
@@ -1191,7 +1685,7 @@ function commandReturn(list) {
     }
     count += 1;
   }
-  if (count) announce(`${count} workers returning.`);
+  if (count) announce("workersReturning", { count });
 }
 
 function commandBuild() {
@@ -1213,7 +1707,7 @@ function commandBuild() {
       worker.internalCarry = false;
     }
   }
-  announce(`${workers.length} workers growing the anthill.`);
+  announce("workersGrowingAnthill", { count: workers.length });
 }
 
 function commandServeQueen() {
@@ -1238,7 +1732,7 @@ function commandServeQueen() {
       worker.internalCarry = false;
     }
   }
-  announce(`${workers.length} workers serving the queen.`);
+  announce("workersServingQueen", { count: workers.length });
 }
 
 function commandFeedLarvae() {
@@ -1260,7 +1754,7 @@ function commandFeedLarvae() {
     worker.carryAmount = 0;
     worker.internalCarry = false;
   }
-  announce(`${workers.length} workers feeding larvae.`);
+  announce("workersFeedingLarvae", { count: workers.length });
 }
 
 function orderWorkerToTunnel(worker, tunnel) {
@@ -1282,13 +1776,13 @@ function orderWorkerToTunnel(worker, tunnel) {
 function commandSetTunnelMode() {
   const workers = selectedUnits().filter((unit) => unit.type === "worker");
   if (!workers.length) {
-    announce("Select workers to build a tunnel.");
+    announce("selectWorkersTunnel");
     return;
   }
   game.tunnelMode = true;
   game.rallyMode = false;
   game.attackMoveMode = false;
-  announce("Click terrain to place the tunnel exit.");
+  announce("clickTunnelExit");
   renderActions();
 }
 
@@ -1296,7 +1790,7 @@ function placeTunnel(worldX, worldY) {
   const workers = selectedUnits().filter((unit) => unit.type === "worker");
   if (!workers.length) {
     game.tunnelMode = false;
-    announce("Tunnel placement cancelled.");
+    announce("tunnelPlacementCancelled");
     return;
   }
   const start = nearestAnthill("player", workers[0].x, workers[0].y);
@@ -1306,7 +1800,7 @@ function placeTunnel(worldX, worldY) {
   const distanceValue = dist(start.x, start.y, targetX, targetY);
   const cost = tunnelCostForDistance(distanceValue);
   if (!canPayTunnel("player", cost)) {
-    announce(`Tunnel needs ${tunnelCostText(cost)}.`);
+    announce("tunnelNeeds", { cost: tunnelCostText(cost) });
     return;
   }
   spendTunnelCost("player", cost);
@@ -1332,7 +1826,7 @@ function placeTunnel(worldX, worldY) {
   selectedTunnelId = tunnel.id;
   selectedHillId = null;
   game.tunnelMode = false;
-  announce(`${workers.length} workers digging a tunnel (${tunnelCostText(cost)}).`);
+  announce("workersDiggingTunnel", { count: workers.length, cost: tunnelCostText(cost) });
   renderActions();
 }
 
@@ -1347,7 +1841,7 @@ function commandAttachTunnel(list, tunnel, shouldAnnounce = true) {
     }
     orderWorkerToTunnel(worker, tunnel);
   }
-  if (added && shouldAnnounce) announce(`${added} workers added to the tunnel.`);
+  if (added && shouldAnnounce) announce("workersAddedTunnel", { count: added });
 }
 
 function commandAttachNearestTunnel() {
@@ -1364,7 +1858,7 @@ function commandAttachNearestTunnel() {
     }
   }
   if (!best) {
-    announce("No active tunnel to join.");
+    announce("noActiveTunnel");
     return;
   }
   commandAttachTunnel(workers, best);
@@ -1384,7 +1878,7 @@ function cancelTunnel(tunnel) {
   }
   tunnels = tunnels.filter((candidate) => candidate.id !== tunnel.id);
   selectedTunnelId = null;
-  announce("Tunnel construction stopped.");
+  announce("tunnelStopped");
   renderActions();
 }
 
@@ -1408,7 +1902,7 @@ function commandStop() {
       unit.internalCarry = false;
     }
   }
-  announce("Orders cleared.");
+  announce("ordersCleared");
 }
 
 function commandAttackNearest() {
@@ -1437,7 +1931,7 @@ function commandAttackNearest() {
     for (const { target, units: markerUnits } of targets.values()) {
       addAttackMarker(target.x, target.y, markerUnits, target.id);
     }
-    announce(`${ordered} ants attacking.`);
+    announce("antsAttacking", { count: ordered });
   }
 }
 
@@ -1461,7 +1955,7 @@ function commandDefend() {
     }
     ordered += 1;
   }
-  if (ordered) announce(`${ordered} ants defending the colony.`);
+  if (ordered) announce("antsDefending", { count: ordered });
 }
 
 function commandSetRallyMode() {
@@ -1469,7 +1963,7 @@ function commandSetRallyMode() {
   game.rallyMode = true;
   game.tunnelMode = false;
   game.attackMoveMode = false;
-  announce("Click terrain to set the queen rally point.");
+  announce("clickRally");
   renderActions();
 }
 
@@ -1483,7 +1977,7 @@ function setQueenRallyPoint(x, y) {
     y: clamp(y, 20, WORLD.height - 20),
   };
   game.rallyMode = false;
-  announce("New ants will rally there.");
+  announce("rallySet");
   renderActions();
 }
 
@@ -1495,19 +1989,19 @@ function layLarvae(team, type, options = {}) {
   if (!hill) return false;
   if (queenPreparedCells(queen) < LARVAE_LAY_COUNT) {
     if (team === "player" && !options.silentCells) {
-      announce("Queen needs a prepared cell. Assign workers to serve her.");
+      announce("queenNeedsCell");
     }
     return false;
   }
   if (colony.protein < LARVA_LAY_PROTEIN_COST) {
-    if (team === "player") announce("Not enough protein.");
+    if (team === "player") announce("notEnoughProtein");
     return false;
   }
   const currentLarvae = countLarvae(team, null, hill.id);
   const capacity = anthillLarvaeCapacity(hill);
   if (capacity - currentLarvae < LARVAE_LAY_COUNT) {
     if (team === "player" && !options.silentCapacity) {
-      announce(`Nursery full (${currentLarvae}/${capacity}). Grow the anthill with workers.`);
+      announce("nurseryFull", { current: currentLarvae, capacity });
     }
     return false;
   }
@@ -1516,7 +2010,7 @@ function layLarvae(team, type, options = {}) {
     const slot = findLarvaCellNearQueen(team, type, hill, queen, slots);
     if (!slot) {
       if (team !== "player") moveQueenAside(team, hill, queen);
-      if (team === "player") announce("Queen needs open space nearby. Move her inside the anthill.");
+      if (team === "player") announce("queenNeedsSpace");
       return false;
     }
     slots.push(slot);
@@ -1528,13 +2022,13 @@ function layLarvae(team, type, options = {}) {
   if (created.length < LARVAE_LAY_COUNT) {
     colony.protein += LARVA_LAY_PROTEIN_COST;
     queen.preparedCells += LARVAE_LAY_COUNT;
-    if (team === "player") announce("Queen needs open space nearby. Move her inside the anthill.");
+    if (team === "player") announce("queenNeedsSpace");
     return false;
   }
   moveQueenAside(team, hill, queen);
   if (team === "player") {
-    const label = type === "worker" ? "worker" : "guard";
-    announce(`Queen laid a ${label} larva.`);
+    const label = type === "worker" ? unitTypeLabel("worker", 1) : unitTypeLabel("fighter", 1);
+    announce("queenLaidLarva", { label });
   }
   return true;
 }
@@ -1542,20 +2036,20 @@ function layLarvae(team, type, options = {}) {
 function commandRaiseQueen(hill) {
   if (!hill || hill.team !== "player") return;
   if (anthillHasQueen(hill)) {
-    announce("This anthill already has a queen.");
+    announce("anthillHasQueen");
     return;
   }
   if (anthillHasQueenLarva(hill)) {
-    announce("A queen is already growing here.");
+    announce("queenAlreadyGrowing");
     return;
   }
   if (colonies.player.protein < QUEEN_COST) {
-    announce(`A new queen needs ${QUEEN_COST} protein.`);
+    announce("newQueenNeeds", { cost: QUEEN_COST });
     return;
   }
   colonies.player.protein -= QUEEN_COST;
   makeLarvae("player", "queen", 1, hill);
-  announce("A new queen is growing in this anthill.");
+  announce("newQueenGrowing");
 }
 
 function issueContextCommand(worldX, worldY) {
@@ -1686,7 +2180,7 @@ function depositCarry(worker) {
   const colony = getColony(worker.team);
   colony[worker.carryKind] += worker.carryAmount;
   if (worker.team === "player") {
-    spawnFloatingText(worker.x, worker.y - 18, `+${worker.carryAmount} ${worker.carryKind}`, "#f4d27b");
+    spawnFloatingText(worker.x, worker.y - 18, `+${worker.carryAmount} ${resourceLabel(worker.carryKind)}`, "#f4d27b");
   }
   worker.carryKind = null;
   worker.carryAmount = 0;
@@ -1781,7 +2275,7 @@ function updateBuilding(worker, dt) {
     hill.radius = Math.min(BUILD_RADIUS_MAX, hill.radius + 7);
     updateLarvaeLayout(worker.team, hill.id);
     if (worker.team === "player") {
-      announce(`Anthill expanded to level ${hill.level}.`);
+      announce("anthillExpanded", { level: hill.level });
     }
   }
 }
@@ -2039,7 +2533,7 @@ function updateServiceWorker(worker, dt, state) {
   queen.preparedCells = before + affordableCells;
   const created = queenPreparedCells(queen) - before;
   if (created > 0 && worker.team === "player") {
-    spawnFloatingText(queen.x, queen.y - queen.radius - 12, created === 1 ? "+1 cell" : `+${created} cells`, "#f4d27b");
+    spawnFloatingText(queen.x, queen.y - queen.radius - 12, created === 1 ? t("cellSingular") : t("cellPlural", { count: created }), "#f4d27b");
   }
 }
 
@@ -2114,9 +2608,9 @@ function killUnit(unit, killerTeam) {
     const nextQueen = liveQueens(unit.team)[0] || null;
     getColony(unit.team).queenId = nextQueen ? nextQueen.id : null;
     if (unit.team === "player" && !colonyHasLivingQueen("player")) {
-      endGame("lost", "Your queen has fallen.");
+      endGame("lost", "queenFallen");
     } else if (unit.team === "enemy" && !colonyHasLivingQueen("enemy")) {
-      endGame("won", "Enemy queen defeated.");
+      endGame("won", "enemyQueenDefeated");
     }
   }
 }
@@ -2214,8 +2708,14 @@ function updateLarvae(team, dt) {
     const workers = ready.filter((larva) => larva.type === "worker").length;
     const fighters = ready.filter((larva) => larva.type === "fighter").length;
     const queens = ready.filter((larva) => larva.type === "queen").length;
-    const text = `${workers ? `${workers} workers ` : ""}${fighters ? `${fighters} guards ` : ""}${queens ? `${queens} queen ` : ""}hatched.`;
-    announce(text.trim());
+    const text = [
+      workers ? `${workers} ${unitTypeLabel("worker", workers)}` : "",
+      fighters ? `${fighters} ${unitTypeLabel("fighter", fighters)}` : "",
+      queens ? `${queens} ${unitTypeLabel("queen", queens)}` : "",
+    ]
+      .filter(Boolean)
+      .join(", ");
+    announce("hatched", { text: currentLanguage === "en" || currentLanguage === "de" ? `${text} ` : text });
   }
 }
 
@@ -2250,7 +2750,7 @@ function updateTunnels(dt) {
         updateSelectionFlags();
         selectedTunnelId = null;
         selectedHillId = newHill.id;
-        announce("New anthill founded.");
+        announce("newAnthill");
       }
     }
   }
@@ -2643,7 +3143,7 @@ function aiManageFighters(enemyFighters) {
 function aiLaunchWave(enemyFighters, targets) {
   if (game.elapsed >= AI_ATTACK_READY_TIME - 45 && !game.aiAttackWarningSent) {
     game.aiAttackWarningSent = true;
-    announce("Enemy guards are gathering for an attack.");
+    announce("enemyAttackPreparing");
   }
   if (game.elapsed < AI_ATTACK_READY_TIME || game.aiWaveTimer > 0) return;
 
@@ -2671,7 +3171,7 @@ function aiLaunchWave(enemyFighters, targets) {
     fighter.feedLarvaId = null;
     fighter.attackMoveTarget = null;
   }
-  if (attackers.length) announce("Enemy attack wave incoming.");
+  if (attackers.length) announce("enemyAttackIncoming");
 }
 
 function updateAI(dt) {
@@ -2755,14 +3255,18 @@ function updateGame(dt) {
   game.messageTimer = Math.max(0, game.messageTimer - dt);
   if (game.messageTimer <= 0) {
     ui.messageLog.textContent = "";
+    game.messageKey = "";
+    game.messageValues = {};
   }
 }
 
-function endGame(status, message) {
+function endGame(status, messageKey, values = {}) {
   if (game.status !== "playing") return;
   game.status = status;
-  game.statusMessage = message;
-  announce(message);
+  game.statusMessageKey = messageKey;
+  game.statusMessageValues = { ...values };
+  game.statusMessage = t(messageKey, values);
+  announce(messageKey, values);
 }
 
 function drawTerrain() {
@@ -2919,10 +3423,10 @@ function drawAnthill(hill) {
   ctx.fillStyle = "#f2ead2";
   ctx.font = "700 12px system-ui, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(player ? `Hill L${hill.level}` : `Enemy L${hill.level}`, 0, -hill.radius - 18);
+  ctx.fillText(player ? t("hillLevel", { level: hill.level }) : t("enemyLevel", { level: hill.level }), 0, -hill.radius - 18);
   ctx.fillStyle = player ? "#f3d06b" : "#aabfff";
   ctx.font = "650 11px system-ui, sans-serif";
-  ctx.fillText(`${countLarvae(hill.team, null, hill.id)}/${anthillLarvaeCapacity(hill)} larvae`, 0, -hill.radius - 5);
+  ctx.fillText(`${countLarvae(hill.team, null, hill.id)}/${anthillLarvaeCapacity(hill)} ${t("larvae").toLowerCase()}`, 0, -hill.radius - 5);
   ctx.restore();
 }
 
@@ -3183,7 +3687,7 @@ function drawTunnel(tunnel) {
       ctx.fillStyle = "#f2ead2";
       ctx.font = "700 11px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(`${progress}% | ${tunnelWorkerCount(tunnel)} workers`, midX, midY - 8);
+      ctx.fillText(t("tunnelWorkersProgress", { progress, workers: tunnelWorkerCount(tunnel) }), midX, midY - 8);
       ctx.fillStyle = "#e4bd63";
       ctx.font = "650 10px system-ui, sans-serif";
       ctx.fillText(tunnelCostText(tunnel.cost), midX, midY + 7);
@@ -3348,7 +3852,7 @@ function drawGameStatus() {
   ctx.fillStyle = game.status === "won" ? "#f3d06b" : "#e06a54";
   ctx.font = "900 42px system-ui, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(game.status === "won" ? "Victory" : "Colony Lost", VIEW.width / 2, VIEW.height / 2 - 18);
+  ctx.fillText(game.status === "won" ? t("victory") : t("colonyLost"), VIEW.width / 2, VIEW.height / 2 - 18);
   ctx.fillStyle = "#f2ead2";
   ctx.font = "700 18px system-ui, sans-serif";
   ctx.fillText(game.statusMessage, VIEW.width / 2, VIEW.height / 2 + 20);
@@ -3386,10 +3890,32 @@ function formatCostAmount(value) {
   return value.toFixed(1).replace(/\.0$/, "");
 }
 
+function resourceLabel(kind) {
+  if (kind === "sand") return t("resourceSand");
+  if (kind === "sticks") return t("resourceSticks");
+  return t("resourceProtein");
+}
+
 function unitTypeLabel(type, count) {
-  if (type === "fighter") return count === 1 ? "guard" : "guards";
-  if (type === "queen") return count === 1 ? "queen" : "queens";
-  return count === 1 ? "worker" : "workers";
+  if (type === "fighter") return count === 1 ? t("unitGuardOne") : t("unitGuardMany");
+  if (type === "queen") return count === 1 ? t("unitQueenOne") : t("unitQueenMany");
+  return count === 1 ? t("unitWorkerOne") : t("unitWorkerMany");
+}
+
+function orderLabel(state) {
+  const keysByState = {
+    idle: "orderIdle",
+    moving: "orderMoving",
+    attack_move: "orderAttackMove",
+    gathering: "orderGathering",
+    returning: "orderReturning",
+    building: "orderBuilding",
+    feeding_larvae: "orderFeedingLarvae",
+    serving_queen: "orderServingQueen",
+    digging: "orderDigging",
+    attacking: "orderAttacking",
+  };
+  return keysByState[state] ? t(keysByState[state]) : state.replaceAll("_", " ");
 }
 
 function appendSelectionText(text) {
@@ -3407,7 +3933,7 @@ function appendIdleWorkerButton() {
   const chip = document.createElement("button");
   chip.type = "button";
   chip.className = "selection-chip";
-  chip.textContent = `Select ${idleWorkers.length} idle workers`;
+  chip.textContent = t("selectIdleWorkers", { count: idleWorkers.length });
   activateButtonOnPointerDown(chip, selectIdleWorkers);
   row.appendChild(chip);
   ui.selectionDetail.appendChild(row);
@@ -3434,7 +3960,7 @@ function selectIdleWorkers() {
   updateSelectionFlags();
   renderHud();
   renderActions();
-  if (selectedIds.size) announce(`Selected ${selectedIds.size} idle workers.`);
+  if (selectedIds.size) announce("selectedIdleWorkers", { count: selectedIds.size });
 }
 
 function renderSelectionPanel() {
@@ -3445,9 +3971,9 @@ function renderSelectionPanel() {
 
   if (tunnel) {
     const progress = Math.floor((tunnel.progress / tunnel.required) * 100);
-    ui.selectionSummary.textContent = tunnel.active ? "Tunnel building" : "Tunnel complete";
-    appendSelectionText(`${progress}% complete | ${tunnelWorkerCount(tunnel)} assigned | ${tunnelActiveWorkerCount(tunnel)} working`);
-    appendSelectionText(`Cost paid: ${tunnelCostText(tunnel.cost)}`);
+    ui.selectionSummary.textContent = tunnel.active ? t("tunnelBuilding") : t("tunnelComplete");
+    appendSelectionText(t("tunnelProgressDetail", { progress, assigned: tunnelWorkerCount(tunnel), working: tunnelActiveWorkerCount(tunnel) }));
+    appendSelectionText(t("costPaid", { cost: tunnelCostText(tunnel.cost) }));
     appendIdleWorkerButton();
     return;
   }
@@ -3455,17 +3981,17 @@ function renderSelectionPanel() {
   if (hill) {
     const queen = queenForAnthill(hill);
     const pendingQueen = anthillHasQueenLarva(hill);
-    ui.selectionSummary.textContent = `Anthill L${hill.level}`;
-    appendSelectionText(`${countLarvae(hill.team, null, hill.id)}/${anthillLarvaeCapacity(hill)} larvae`);
-    appendSelectionText(`Protein store: ${formatAmount(getColony(hill.team).protein)}/${proteinStorageCapacity(hill)}`);
-    appendSelectionText(queen ? `Queen cells: ${queenPreparedCells(queen)}` : pendingQueen ? "Queen growing" : "No queen");
+    ui.selectionSummary.textContent = t("anthillSummary", { level: hill.level });
+    appendSelectionText(`${countLarvae(hill.team, null, hill.id)}/${anthillLarvaeCapacity(hill)} ${t("larvae").toLowerCase()}`);
+    appendSelectionText(t("proteinStore", { current: formatAmount(getColony(hill.team).protein), capacity: proteinStorageCapacity(hill) }));
+    appendSelectionText(queen ? t("queenCells", { count: queenPreparedCells(queen) }) : pendingQueen ? t("queenGrowing") : t("noQueen"));
     appendIdleWorkerButton();
     return;
   }
 
   if (!selection.length) {
-    ui.selectionSummary.textContent = "0 units";
-    appendSelectionText(`Enemy queen: ${colonyHasLivingQueen("enemy") ? "alive" : "dead"}`);
+    ui.selectionSummary.textContent = t("zeroUnits");
+    appendSelectionText(t("enemyQueenStatus", { status: colonyHasLivingQueen("enemy") ? t("alive").toLowerCase() : t("dead").toLowerCase() }));
     appendIdleWorkerButton();
     return;
   }
@@ -3476,7 +4002,7 @@ function renderSelectionPanel() {
     ["fighter", selection.filter((unit) => unit.type === "fighter").length],
   ].filter(([, count]) => count > 0);
 
-  ui.selectionSummary.textContent = `${selection.length} selected`;
+  ui.selectionSummary.textContent = t("selectedCount", { count: selection.length });
   const row = document.createElement("div");
   row.className = "selection-type-buttons";
   const activeType = typeCounts.length === 1 ? typeCounts[0][0] : null;
@@ -3492,12 +4018,12 @@ function renderSelectionPanel() {
 
   const carrying = selection
     .filter((unit) => unit.carryAmount > 0)
-    .map((unit) => `${unit.carryAmount} ${unit.carryKind}`)
+    .map((unit) => `${unit.carryAmount} ${resourceLabel(unit.carryKind)}`)
     .join(", ");
-  const orders = [...new Set(selection.map((unit) => unit.state.replaceAll("_", " ")))].slice(0, 3).join(", ");
-  appendSelectionText(`${orders ? `Orders: ${orders}` : "Idle or awaiting orders"}${carrying ? ` | carrying ${carrying}` : ""}`);
+  const orders = [...new Set(selection.map((unit) => orderLabel(unit.state)))].slice(0, 3).join(", ");
+  appendSelectionText(`${orders ? t("ordersPrefix", { orders }) : t("idleOrders")}${carrying ? ` | ${t("carrying", { items: carrying })}` : ""}`);
   const selectedQueen = selection.find((unit) => unit.type === "queen");
-  if (selectedQueen) appendSelectionText(`Queen cells: ${queenPreparedCells(selectedQueen)}`);
+  if (selectedQueen) appendSelectionText(t("queenCells", { count: queenPreparedCells(selectedQueen) }));
   appendIdleWorkerButton();
 }
 
@@ -3510,7 +4036,7 @@ function renderHud() {
   ui.fighters.textContent = countUnits("player", "fighter").toString();
   ui.larvae.textContent = `${countLarvae("player")}/${colonyLarvaeCapacity("player")}`;
   const queens = liveQueens("player").length;
-  ui.queenStatus.textContent = queens > 1 ? `${queens} alive` : queens === 1 ? "Alive" : "Dead";
+  ui.queenStatus.textContent = queens > 1 ? t("queenAliveCount", { count: queens }) : queens === 1 ? t("alive") : t("dead");
   ui.queenStatus.className = queens > 0 ? "good" : "danger";
   renderSelectionPanel();
 }
@@ -3564,8 +4090,14 @@ function renderActions() {
   const queenHillHasRoom = queenHillCapacity - queenHillLarvae >= LARVAE_LAY_COUNT;
   const queenCells = selectedQueen ? queenPreparedCells(selectedQueen) : 0;
   const layCost = queenHill
-    ? `${formatCostAmount(LARVA_LAY_PROTEIN_COST)} protein, ${LARVAE_LAY_COUNT} cell (${queenCells}), nursery ${queenHillLarvae}/${queenHillCapacity}`
-    : "No anthill";
+    ? t("layCost", {
+        protein: formatCostAmount(LARVA_LAY_PROTEIN_COST),
+        cells: LARVAE_LAY_COUNT,
+        prepared: queenCells,
+        larvae: queenHillLarvae,
+        capacity: queenHillCapacity,
+      })
+    : t("noAnthill");
   const tunnel = selectedTunnel();
   const hill = selectedHill();
   const activeTunnel = tunnels.find((candidate) => candidate.team === "player" && candidate.active);
@@ -3576,51 +4108,56 @@ function renderActions() {
   }
 
   if (tunnel && !selection.length) {
-    const progress = `${Math.floor((tunnel.progress / tunnel.required) * 100)}%, ${tunnelWorkerCount(tunnel)} workers`;
-    addAction(tunnel.active ? "Tunnel Building" : "Tunnel Complete", progress, true, () => {});
-    addAction("Cancel Tunnel", "Esc", !tunnel.active, () => cancelTunnel(tunnel));
+    const progress = t("tunnelProgressCost", { progress: Math.floor((tunnel.progress / tunnel.required) * 100), workers: tunnelWorkerCount(tunnel) });
+    addAction(tunnel.active ? t("actionTunnelBuilding") : t("actionTunnelComplete"), progress, true, () => {});
+    addAction(t("actionCancelTunnel"), "Esc", !tunnel.active, () => cancelTunnel(tunnel));
   } else if (hill && !selection.length) {
     const hasHillQueen = anthillHasQueen(hill);
     const pendingQueen = anthillHasQueenLarva(hill);
     addAction(
-      "Raise New Queen",
-      `${QUEEN_COST} protein, slow growth`,
+      t("actionRaiseQueen"),
+      t("slowGrowthCost", { cost: QUEEN_COST }),
       hill.team !== "player" || hasHillQueen || pendingQueen || player.protein < QUEEN_COST,
       () => commandRaiseQueen(hill),
     );
   } else if (!selection.length) {
-    addAction("No Selection", "", true, () => {});
+    addAction(t("actionNoSelection"), "", true, () => {});
   } else {
     if (hasQueen) {
-      addAction("Lay Worker Larva", layCost, player.protein < LARVA_LAY_PROTEIN_COST || queenCells < LARVAE_LAY_COUNT || !queenHillHasRoom, () =>
+      addAction(t("actionLayWorker"), layCost, player.protein < LARVA_LAY_PROTEIN_COST || queenCells < LARVAE_LAY_COUNT || !queenHillHasRoom, () =>
         layLarvae("player", "worker", { queenId: selectedQueen.id }),
       );
-      addAction("Lay Guard Larva", layCost, player.protein < LARVA_LAY_PROTEIN_COST || queenCells < LARVAE_LAY_COUNT || !queenHillHasRoom, () =>
+      addAction(t("actionLayGuard"), layCost, player.protein < LARVA_LAY_PROTEIN_COST || queenCells < LARVAE_LAY_COUNT || !queenHillHasRoom, () =>
         layLarvae("player", "fighter", { queenId: selectedQueen.id }),
       );
-      addAction(game.rallyMode ? "Setting Rally" : "Set Rally Point", "R, then click terrain", false, () => commandSetRallyMode());
+      addAction(game.rallyMode ? t("actionSettingRally") : t("actionSetRally"), t("costRClick"), false, () => commandSetRallyMode());
     }
 
     if (workers.length) {
-      addAction("Gather Food", "Protein sources", false, () => commandGatherNearest("protein"));
-      addAction("Gather Materials", "Sand and sticks", false, () => commandGatherMaterials());
-      addAction("Return", "Deposit resources", false, () => commandReturn(selectedUnits()));
-      addAction("Grow Anthill", `${BUILD_COST.sand} sand, ${BUILD_COST.sticks} sticks, +${LARVAE_BATCH_SIZE} larvae`, player.sand < BUILD_COST.sand || player.sticks < BUILD_COST.sticks, () => commandBuild());
-      addAction("Serve Queen", "1 protein per cell", false, () => commandServeQueen());
-      addAction("Feed Larvae", "Consumes protein", false, () => commandFeedLarvae());
-      addAction(game.tunnelMode ? "Placing Tunnel" : "Build Tunnel", "100 protein, 100 sand, 100 sticks per screen", false, () => commandSetTunnelMode());
+      addAction(t("actionGatherFood"), t("costProteinSources"), false, () => commandGatherNearest("protein"));
+      addAction(t("actionGatherMaterials"), t("costSandSticks"), false, () => commandGatherMaterials());
+      addAction(t("actionReturn"), t("costDepositResources"), false, () => commandReturn(selectedUnits()));
+      addAction(
+        t("actionGrowAnthill"),
+        t("growAnthillCost", { sand: BUILD_COST.sand, sticks: BUILD_COST.sticks, larvae: LARVAE_BATCH_SIZE }),
+        player.sand < BUILD_COST.sand || player.sticks < BUILD_COST.sticks,
+        () => commandBuild(),
+      );
+      addAction(t("actionServeQueen"), t("costProteinPerCell"), false, () => commandServeQueen());
+      addAction(t("actionFeedLarvae"), t("costConsumesProtein"), false, () => commandFeedLarvae());
+      addAction(game.tunnelMode ? t("actionPlacingTunnel") : t("actionBuildTunnel"), t("tunnelScreenCost"), false, () => commandSetTunnelMode());
       if (activeTunnel) {
-        addAction("Join Tunnel", `${tunnelWorkerCount(activeTunnel)} assigned`, false, () => commandAttachNearestTunnel());
+        addAction(t("actionJoinTunnel"), t("assigned", { count: tunnelWorkerCount(activeTunnel) }), false, () => commandAttachNearestTunnel());
       }
     }
 
-    addAction(game.attackMoveMode ? "Attack Move Active" : "Attack Move", "A, then click terrain", false, () => commandSetAttackMoveMode());
+    addAction(game.attackMoveMode ? t("actionAttackMoveActive") : t("actionAttackMove"), t("costAClick"), false, () => commandSetAttackMoveMode());
 
     if (workers.length || fighters.length) {
-      addAction("Attack Nearest", "Combat order", false, () => commandAttackNearest());
-      addAction("Defend", "Guard anthill", false, () => commandDefend());
+      addAction(t("actionAttackNearest"), t("costCombatOrder"), false, () => commandAttackNearest());
+      addAction(t("actionDefend"), t("costGuardAnthill"), false, () => commandDefend());
     }
-    addAction("Stop", "Clear orders", false, () => commandStop());
+    addAction(t("actionStop"), t("costClearOrders"), false, () => commandStop());
   }
 
   const signature = JSON.stringify(
@@ -3728,21 +4265,21 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "Escape") {
     if (game.rallyMode) {
       game.rallyMode = false;
-      announce("Rally placement cancelled.");
+      announce("rallyCancelled");
       renderActions();
       event.preventDefault();
       return;
     }
     if (game.tunnelMode) {
       game.tunnelMode = false;
-      announce("Tunnel placement cancelled.");
+      announce("tunnelPlacementCancelled");
       renderActions();
       event.preventDefault();
       return;
     }
     if (game.attackMoveMode) {
       game.attackMoveMode = false;
-      announce("Attack move cancelled.");
+      announce("attackMoveCancelled");
       renderActions();
       event.preventDefault();
       return;
@@ -3778,6 +4315,14 @@ window.addEventListener("keyup", (event) => {
 
 window.addEventListener("resize", resizeCanvas);
 
+if (ui.languageSelect) {
+  ui.languageSelect.value = currentLanguage;
+  ui.languageSelect.addEventListener("change", (event) => {
+    setLanguage(event.target.value);
+  });
+}
+
+applyStaticTranslations();
 resizeCanvas();
 setupGame();
 renderHud();

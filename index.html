@@ -11,45 +11,54 @@
     <main id="game-shell">
       <canvas id="game" aria-label="Ant colony strategy game"></canvas>
 
+      <label id="language-control" for="language-select">
+        <span data-i18n="languageLabel">Language</span>
+        <select id="language-select" aria-label="Language">
+          <option value="en">EN</option>
+          <option value="de">DE</option>
+          <option value="uk">UK</option>
+        </select>
+      </label>
+
       <section id="top-hud" class="hud-strip" aria-label="Colony status">
         <div class="hud-group">
-          <span class="label">Protein</span>
+          <span class="label" data-i18n="protein">Protein</span>
           <strong id="protein">0</strong>
         </div>
         <div class="hud-group">
-          <span class="label">Sand</span>
+          <span class="label" data-i18n="sand">Sand</span>
           <strong id="sand">0</strong>
         </div>
         <div class="hud-group">
-          <span class="label">Sticks</span>
+          <span class="label" data-i18n="sticks">Sticks</span>
           <strong id="sticks">0</strong>
         </div>
         <div class="hud-group">
-          <span class="label">Workers</span>
+          <span class="label" data-i18n="workers">Workers</span>
           <strong id="workers">0</strong>
         </div>
         <div class="hud-group">
-          <span class="label">Guards</span>
+          <span class="label" data-i18n="guards">Guards</span>
           <strong id="fighters">0</strong>
         </div>
         <div class="hud-group">
-          <span class="label">Larvae</span>
+          <span class="label" data-i18n="larvae">Larvae</span>
           <strong id="larvae">0</strong>
         </div>
         <div class="hud-group">
-          <span class="label">Queen</span>
+          <span class="label" data-i18n="queen">Queen</span>
           <strong id="queen-status">Alive</strong>
         </div>
       </section>
 
       <section id="selection-panel" class="hud-panel" aria-label="Selection">
-        <div class="panel-title">Selection</div>
+        <div class="panel-title" data-i18n="selection">Selection</div>
         <div id="selection-summary">0 units</div>
         <div id="selection-detail"></div>
       </section>
 
       <section id="action-panel" class="hud-panel" aria-label="Actions">
-        <div class="panel-title">Actions</div>
+        <div class="panel-title" data-i18n="actions">Actions</div>
         <div id="action-buttons"></div>
       </section>
 
