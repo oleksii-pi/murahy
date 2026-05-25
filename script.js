@@ -511,13 +511,20 @@ const MAX_LARVA_FEEDERS = 4;
 const LARVA_FEED_LOAD_TIME = 0.14;
 const LARVA_FEED_STREAM_GAP = 0.34;
 const LARVA_FEED_STUCK_LIMIT = 3;
+const LARVA_FEED_CONGESTION_MIN_FEEDERS = 8;
+const LARVA_FEED_CONGESTION_STUCK_TIME = 1.2;
+const LARVA_FEED_CONGESTION_RATIO = 0.25;
+const LARVA_FEED_CONGESTION_COOLDOWN = 5;
 const RESOURCE_SPAWN_INTERVAL = 1.4;
 const TUNNEL_TIME = 50;
 const TUNNEL_BASE_COST = { protein: 100, sand: 100, sticks: 100 };
 const AI_THINK_INTERVAL = 0.9;
-const AI_ATTACK_READY_TIME = 240;
+const AI_GROWTH_ONLY_TIME = 180;
+const AI_ATTACK_READY_TIME = 600;
 const AI_WAVE_BASE_GAP = 70;
 const AI_WAVE_MIN_GAP = 42;
+const AI_QUEEN_DEFENSE_RADIUS = 300;
+const AI_QUEEN_DEFENSE_WORKER_LIMIT = 14;
 const COLLISION_PADDING = 1.8;
 const COLLISION_ITERATIONS = 5;
 const MELEE_REACH_PADDING = 4;
@@ -727,11 +734,14 @@ function makeUnit(team, type, x, y, homeHillId = null) {
     feedStuckX: x,
     feedStuckY: y,
     feedStuckDistance: null,
+    feedBlockedUntil: 0,
     preparedCells: 0,
     attackMoveTarget: null,
     commandX: x,
     commandY: y,
     lastHitFrom: null,
+    lastHitAt: -Infinity,
+    aiRole: null,
   };
   units.push(unit);
   if (type === "queen") {
@@ -753,6 +763,8 @@ function makeAnthill(team, x, y) {
     radius: 58,
     level: 1,
     buildProgress: 0,
+    feedCongestionUntil: 0,
+    feedCongestionFeederCap: Infinity,
   };
   anthills.push(hill);
   return hill;
@@ -2342,6 +2354,10 @@ function resetFeedingStuck(worker) {
   worker.feedStuckDistance = null;
 }
 
+function markFeedingBlocked(worker) {
+  worker.feedBlockedUntil = Math.max(worker.feedBlockedUntil || 0, game.elapsed + LARVA_FEED_CONGESTION_COOLDOWN);
+}
+
 function updateFeedingStuck(worker, target, dt) {
   const targetDistance = dist(worker.x, worker.y, target.x, target.y);
   const improved = worker.feedStuckDistance === null || targetDistance < worker.feedStuckDistance - 1.2;
@@ -2357,6 +2373,9 @@ function updateFeedingStuck(worker, target, dt) {
   worker.feedStuckX = worker.x;
   worker.feedStuckY = worker.y;
   worker.feedStuckDistance = Math.min(worker.feedStuckDistance ?? targetDistance, targetDistance);
+  if (worker.feedStuckTimer >= LARVA_FEED_CONGESTION_STUCK_TIME) {
+    markFeedingBlocked(worker);
+  }
   return worker.feedStuckTimer >= LARVA_FEED_STUCK_LIMIT;
 }
 
@@ -2550,7 +2569,9 @@ function damageFor(attacker, target) {
   if (attacker.type === "fighter" && target.type === "worker") return 2;
   if (attacker.type === "fighter" && target.type === "fighter") return 1;
   if (attacker.type === "fighter" && target.type === "queen") return 1;
-  if (attacker.type === "queen") return 1;
+  if (attacker.type === "queen" && target.type === "fighter") return Math.ceil(target.maxHp / 2);
+  if (attacker.type === "queen" && target.type === "worker") return Math.ceil(target.maxHp / 2);
+  if (attacker.type === "queen") return 2;
   return 1;
 }
 
@@ -2577,6 +2598,7 @@ function updateAttacking(unit, dt) {
   if (unit.attackTimer > 0) return;
   unit.attackTimer = unit.cooldown;
   activeTarget.lastHitFrom = unit.team;
+  activeTarget.lastHitAt = game.elapsed;
   const damage = damageFor(unit, activeTarget);
   activeTarget.hp -= damage;
   spawnFloatingText(activeTarget.x, activeTarget.y - activeTarget.radius - 10, `-${damage}`, unit.team === "player" ? "#ffd166" : "#9fc5ff");
@@ -2623,12 +2645,16 @@ function cleanupUnits() {
 function updateUnit(unit, dt) {
   unit.attackTimer = Math.max(0, unit.attackTimer - dt);
 
-  if (unit.type !== "queen" && unit.state !== "attacking" && unit.state !== "gathering" && unit.state !== "returning") {
-    const threat = findNearestEnemy(unit, unit.type === "fighter" ? 110 : 70);
-    if (threat && (unit.type === "fighter" || unit.state === "idle" || unit.state === "moving" || unit.state === "attack_move")) {
+  if (unit.state !== "attacking" && unit.state !== "gathering" && unit.state !== "returning") {
+    const threatRange = unit.type === "fighter" ? 110 : unit.type === "queen" ? 155 : 70;
+    const threat = findNearestEnemy(unit, threatRange);
+    if (threat && (unit.type === "fighter" || unit.type === "queen" || unit.state === "idle" || unit.state === "moving" || unit.state === "attack_move")) {
       if (unit.state === "attack_move") unit.attackMoveTarget = unit.target;
       unit.state = "attacking";
       unit.targetId = threat.id;
+      unit.target = null;
+      unit.resourceId = null;
+      unit.keepGathering = false;
     }
   }
 
@@ -2769,66 +2795,70 @@ function updateSpawns(dt) {
 function aiTargets() {
   const time = game.elapsed;
   const waveGrowth = game.aiWave * 4;
+  const growthProgress = clamp(time / AI_GROWTH_ONLY_TIME, 0, 1);
+  const combatProgress = clamp((time - AI_GROWTH_ONLY_TIME) / (AI_ATTACK_READY_TIME - AI_GROWTH_ONLY_TIME), 0, 1);
   const targets = {
-    workers: 30,
+    workers: Math.round(28 + growthProgress * 32),
     fighters: 0,
-    hillLevel: 3,
-    feederShare: 0.76,
-    materialShare: 0.24,
-    queenServants: 3,
-    attackMinFighters: 10,
-    waveSize: 9,
-    minWorkersBeforeFighters: 24,
-    fighterProteinFloor: 18,
+    hillLevel: 2,
+    feederShare: 0.72 + growthProgress * 0.08,
+    materialShare: 0.18 + growthProgress * 0.07,
+    queenServants: 3 + Math.floor(growthProgress * 3),
+    builderShare: 0.34,
+    builderMin: 3,
+    builderMax: 10,
+    cellBuffer: LARVAE_BATCH_SIZE * 2,
+    attackMinFighters: 36,
+    waveSize: 28,
+    minWorkersBeforeFighters: 999,
+    fighterProteinFloor: 999,
   };
 
-  if (time >= 65) {
-    targets.workers = 38;
-    targets.hillLevel = 4;
-    targets.feederShare = 0.74;
-    targets.materialShare = 0.32;
-    targets.queenServants = 4;
-    targets.minWorkersBeforeFighters = 32;
+  if (time >= 40) {
+    targets.hillLevel = 3;
   }
-  if (time >= 135) {
-    targets.workers = 44;
-    targets.fighters = 12;
+  if (time >= 95) {
     targets.hillLevel = 4;
-    targets.feederShare = 0.7;
-    targets.materialShare = 0.32;
-    targets.queenServants = 5;
-    targets.minWorkersBeforeFighters = 34;
-    targets.fighterProteinFloor = 14;
   }
-  if (time >= 180) {
-    targets.workers = 48;
-    targets.fighters = 28;
+  if (time >= 145) {
     targets.hillLevel = 5;
-    targets.feederShare = 0.76;
-    targets.materialShare = 0.28;
-    targets.queenServants = 5;
-    targets.attackMinFighters = 12;
-    targets.waveSize = 14;
-    targets.minWorkersBeforeFighters = 36;
+  }
+
+  if (time >= AI_GROWTH_ONLY_TIME) {
+    targets.workers = Math.round(60 + combatProgress * 8);
+    targets.fighters = Math.round(18 + combatProgress * 54);
+    targets.hillLevel = 6;
+    targets.feederShare = 0.78;
+    targets.materialShare = 0.2;
+    targets.queenServants = 6;
+    targets.builderShare = 0.24;
+    targets.builderMax = 9;
+    targets.cellBuffer = LARVAE_BATCH_SIZE * 3;
+    targets.minWorkersBeforeFighters = 44;
     targets.fighterProteinFloor = 10;
   }
-  if (time >= AI_ATTACK_READY_TIME) {
-    targets.workers = 50;
-    targets.fighters = 46 + waveGrowth;
-    targets.hillLevel = 6;
-    targets.feederShare = 0.8;
-    targets.materialShare = 0.22;
-    targets.queenServants = 5;
-    targets.attackMinFighters = 14 + Math.min(12, game.aiWave * 2);
-    targets.waveSize = 18 + Math.min(18, game.aiWave * 3);
-    targets.minWorkersBeforeFighters = 38;
+  if (time >= 300) {
+    targets.fighters = Math.max(targets.fighters, 42);
+    targets.hillLevel = 7;
+    targets.minWorkersBeforeFighters = 50;
+    targets.fighterProteinFloor = 8;
+  }
+  if (time >= 420) {
+    targets.fighters = Math.max(targets.fighters, 60);
+    targets.hillLevel = 8;
+    targets.minWorkersBeforeFighters = 54;
     targets.fighterProteinFloor = 6;
   }
-  if (time >= 300) {
-    targets.workers = 52;
-    targets.fighters = 60 + waveGrowth;
-    targets.attackMinFighters = 18 + Math.min(14, game.aiWave * 2);
-    targets.waveSize = 22 + Math.min(20, game.aiWave * 3);
+  if (time >= AI_ATTACK_READY_TIME) {
+    targets.workers = 70;
+    targets.fighters = 84 + waveGrowth;
+    targets.hillLevel = 8;
+    targets.feederShare = 0.8;
+    targets.materialShare = 0.18;
+    targets.attackMinFighters = 36 + Math.min(18, game.aiWave * 2);
+    targets.waveSize = 30 + Math.min(24, game.aiWave * 3);
+    targets.minWorkersBeforeFighters = 56;
+    targets.fighterProteinFloor = 5;
   }
 
   return targets;
@@ -2842,6 +2872,7 @@ function clearInternalCarry(worker) {
 }
 
 function releaseAIWorker(worker) {
+  worker.aiRole = null;
   worker.state = "idle";
   worker.target = null;
   worker.targetId = null;
@@ -2852,6 +2883,7 @@ function releaseAIWorker(worker) {
   worker.serviceTimer = 0;
   worker.feedSlot = 0;
   worker.feedLarvaId = null;
+  worker.feedBlockedUntil = 0;
   worker.attackMoveTarget = null;
   clearInternalCarry(worker);
 }
@@ -2877,6 +2909,7 @@ function aiOrderGather(worker, kind) {
   }
   if (!resource) return false;
 
+  worker.aiRole = null;
   worker.state = "gathering";
   worker.resourceId = resource.id;
   worker.gatherTimer = 0;
@@ -2888,12 +2921,14 @@ function aiOrderGather(worker, kind) {
   worker.serviceTimer = 0;
   worker.feedSlot = 0;
   worker.feedLarvaId = null;
+  worker.feedBlockedUntil = 0;
   worker.attackMoveTarget = null;
   clearInternalCarry(worker);
   return true;
 }
 
 function aiOrderServeQueen(worker, queen) {
+  worker.aiRole = null;
   worker.state = "serving_queen";
   worker.target = { x: queen.x, y: queen.y };
   worker.targetId = queen.id;
@@ -2904,11 +2939,13 @@ function aiOrderServeQueen(worker, queen) {
   worker.serviceTimer = 0;
   worker.feedSlot = 0;
   worker.feedLarvaId = null;
+  worker.feedBlockedUntil = 0;
   worker.attackMoveTarget = null;
   clearInternalCarry(worker);
 }
 
 function aiOrderFeedLarvae(worker, hill) {
+  worker.aiRole = null;
   worker.state = "feeding_larvae";
   worker.target = { x: hill.x, y: hill.y };
   worker.targetId = hill.id;
@@ -2919,6 +2956,7 @@ function aiOrderFeedLarvae(worker, hill) {
   worker.serviceTimer = 0;
   worker.feedSlot = 0;
   worker.feedLarvaId = null;
+  worker.feedBlockedUntil = 0;
   worker.attackMoveTarget = null;
   worker.carryKind = null;
   worker.carryAmount = 0;
@@ -2926,6 +2964,7 @@ function aiOrderFeedLarvae(worker, hill) {
 }
 
 function aiOrderBuild(worker, hill) {
+  worker.aiRole = null;
   worker.state = "building";
   worker.target = { x: hill.x, y: hill.y };
   worker.targetId = hill.id;
@@ -2936,19 +2975,90 @@ function aiOrderBuild(worker, hill) {
   worker.serviceTimer = 0;
   worker.feedSlot = 0;
   worker.feedLarvaId = null;
+  worker.feedBlockedUntil = 0;
   worker.attackMoveTarget = null;
   clearInternalCarry(worker);
+}
+
+function aiOrderQueenDefense(worker, target) {
+  worker.aiRole = "queen_defense";
+  worker.state = "attacking";
+  worker.targetId = target.id;
+  worker.target = null;
+  worker.resourceId = null;
+  worker.gatherTimer = 0;
+  worker.keepGathering = false;
+  worker.serviceStage = null;
+  worker.serviceTimer = 0;
+  worker.feedSlot = 0;
+  worker.feedLarvaId = null;
+  worker.feedBlockedUntil = 0;
+  worker.attackMoveTarget = null;
+  clearInternalCarry(worker);
+}
+
+function aiQueenThreats(queen) {
+  const enemyTeam = getEnemyTeam(queen.team);
+  return units
+    .filter((candidate) => {
+      if (candidate.team !== enemyTeam || candidate.hp <= 0) return false;
+      const directlyAttackingQueen = candidate.state === "attacking" && candidate.targetId === queen.id;
+      const nearQueen = dist(candidate.x, candidate.y, queen.x, queen.y) <= AI_QUEEN_DEFENSE_RADIUS;
+      return directlyAttackingQueen || nearQueen;
+    })
+    .sort((a, b) => {
+      const aDirect = a.state === "attacking" && a.targetId === queen.id ? -1000 : 0;
+      const bDirect = b.state === "attacking" && b.targetId === queen.id ? -1000 : 0;
+      const aType = a.type === "fighter" ? -120 : a.type === "queen" ? -60 : 0;
+      const bType = b.type === "fighter" ? -120 : b.type === "queen" ? -60 : 0;
+      return aDirect + aType + dist(a.x, a.y, queen.x, queen.y) - (bDirect + bType + dist(b.x, b.y, queen.x, queen.y));
+    });
+}
+
+function aiManageQueenDefense(enemyWorkers) {
+  const queen = nearestQueen("enemy");
+  if (!queen || queen.hp <= 0) return;
+
+  const threats = aiQueenThreats(queen);
+  const queenDefenseWorkers = enemyWorkers.filter((worker) => worker.aiRole === "queen_defense");
+  if (!threats.length) {
+    queenDefenseWorkers.forEach((worker) => releaseAIWorker(worker));
+    return;
+  }
+
+  const threatIds = new Set(threats.map((threat) => threat.id));
+  const activeDefenders = queenDefenseWorkers.filter((worker) => worker.state === "attacking" && threatIds.has(worker.targetId));
+  const queenWasHit = queen.lastHitFrom === "player" && game.elapsed - queen.lastHitAt < 8;
+  const desiredDefenders = Math.min(
+    enemyWorkers.length,
+    AI_QUEEN_DEFENSE_WORKER_LIMIT,
+    Math.max(queenWasHit ? 6 : 4, threats.length * 4),
+  );
+  if (activeDefenders.length >= desiredDefenders) return;
+
+  const candidates = enemyWorkers
+    .filter((worker) => worker.hp > 0 && !activeDefenders.includes(worker))
+    .sort((a, b) => dist(a.x, a.y, queen.x, queen.y) - dist(b.x, b.y, queen.x, queen.y));
+
+  for (const worker of candidates.slice(0, desiredDefenders - activeDefenders.length)) {
+    const target = threats.reduce((best, threat) => {
+      if (!best) return threat;
+      return dist(worker.x, worker.y, threat.x, threat.y) < dist(worker.x, worker.y, best.x, best.y) ? threat : best;
+    }, null);
+    if (target) aiOrderQueenDefense(worker, target);
+  }
 }
 
 function aiManageQueenServants(enemyWorkers, targets) {
   const queen = nearestQueen("enemy");
   if (!queen) return;
   const colony = colonies.enemy;
-  const larvaeDemand = countLarvae("enemy") + LARVAE_BATCH_SIZE * 3;
-  const desiredCells = Math.min(colonyLarvaeCapacity("enemy"), Math.max(LARVAE_BATCH_SIZE * 3, larvaeDemand));
+  const larvaeDemand = countLarvae("enemy") + targets.cellBuffer;
+  const desiredCells = Math.min(colonyLarvaeCapacity("enemy"), Math.max(targets.cellBuffer, larvaeDemand));
   const needsCells = queenPreparedCells(queen) < desiredCells;
   const canSpare = Math.max(0, enemyWorkers.length - 2);
-  const desiredServants = needsCells && colony.protein >= 1 ? Math.min(canSpare, targets.queenServants) : 0;
+  const workerBasedLimit = enemyWorkers.length < 9 ? 1 : enemyWorkers.length < 18 ? 2 : targets.queenServants;
+  const desiredServants = needsCells && colony.protein >= 1 ? Math.min(canSpare, workerBasedLimit) : 0;
   let servants = enemyWorkers.filter((worker) => worker.state === "serving_queen" && worker.targetId === queen.id);
 
   if (servants.length > desiredServants) {
@@ -2979,7 +3089,7 @@ function aiManageLarvae(targets) {
     const currentFighters = countUnits("enemy", "fighter") + countLarvae("enemy", "fighter");
     const urgentlyNeedsWorkers = currentWorkers < Math.min(targets.minWorkersBeforeFighters, targets.workers);
     const canRaiseFighters =
-      game.elapsed >= 135 &&
+      game.elapsed >= AI_GROWTH_ONLY_TIME &&
       currentWorkers >= targets.minWorkersBeforeFighters &&
       currentFighters < targets.fighters &&
       colony.protein >= targets.fighterProteinFloor;
@@ -2990,7 +3100,7 @@ function aiManageLarvae(targets) {
       type = "fighter";
     } else if (currentWorkers < targets.workers) {
       type = "worker";
-    } else if (game.elapsed >= 180 && currentFighters < targets.fighters + LARVAE_BATCH_SIZE && colony.protein > targets.fighterProteinFloor) {
+    } else if (game.elapsed >= AI_GROWTH_ONLY_TIME && currentFighters < targets.fighters + LARVAE_BATCH_SIZE && colony.protein > targets.fighterProteinFloor) {
       type = "fighter";
     } else if (currentWorkers < targets.workers + LARVAE_BATCH_SIZE && colony.protein > 14) {
       type = "worker";
@@ -3001,25 +3111,104 @@ function aiManageLarvae(targets) {
   }
 }
 
+function feedingWorkersForHill(team, hill, candidates = units) {
+  if (!hill) return [];
+  return candidates.filter((worker) => {
+    if (worker.team !== team || worker.type !== "worker" || worker.hp <= 0 || worker.state !== "feeding_larvae") return false;
+    if (worker.targetId === hill.id) return true;
+    const larva = getLarva(worker.feedLarvaId);
+    return Boolean(larva && larvaMatchesHill(larva, hill));
+  });
+}
+
+function hungryLarvaeForHill(team, hill) {
+  if (!hill) return [];
+  return larvae.filter((larva) => {
+    if (larva.team !== team || larva.type === "queen" || larva.progress >= larva.hatchTime - 0.01) return false;
+    return larvaMatchesHill(larva, hill);
+  });
+}
+
+function feedingWorkerIsBlocked(worker) {
+  return worker.feedStuckTimer >= LARVA_FEED_CONGESTION_STUCK_TIME || (worker.feedBlockedUntil || 0) > game.elapsed;
+}
+
+function feedingReleasePriority(worker) {
+  let priority = worker.feedStuckTimer * 100;
+  if ((worker.feedBlockedUntil || 0) > game.elapsed) priority += 1000;
+  if (!worker.feedLarvaId) priority += 80;
+  if (worker.serviceStage === "to_storage") priority += 40;
+  return priority;
+}
+
+function releaseFeedingWorkers(feeders, count) {
+  feeders
+    .slice()
+    .sort((a, b) => feedingReleasePriority(b) - feedingReleasePriority(a))
+    .slice(0, count)
+    .forEach((worker) => releaseAIWorker(worker));
+}
+
+function feedingCongestionFor(team, hill, feeders = feedingWorkersForHill(team, hill)) {
+  const hungryLarvae = hungryLarvaeForHill(team, hill);
+  const activeFeeders = feeders.filter((worker) => worker.feedLarvaId || worker.serviceStage === "to_larva" || worker.serviceStage === "loading_food");
+  const blockedFeeders = feeders.filter((worker) => feedingWorkerIsBlocked(worker));
+  const usefulCapacity = Math.max(1, hungryLarvae.length * MAX_LARVA_FEEDERS);
+  const blockedRatio = blockedFeeders.length / Math.max(1, activeFeeders.length || feeders.length);
+  const overUsefulCapacity = feeders.length > usefulCapacity;
+  const congested =
+    feeders.length >= LARVA_FEED_CONGESTION_MIN_FEEDERS &&
+    (overUsefulCapacity || blockedRatio >= LARVA_FEED_CONGESTION_RATIO);
+
+  const overflowRelease = Math.max(0, feeders.length - usefulCapacity);
+  const blockedRelease = blockedFeeders.length ? Math.ceil(blockedFeeders.length * 0.5) : 0;
+  const pressureRelease = blockedRatio >= LARVA_FEED_CONGESTION_RATIO ? Math.ceil(feeders.length * 0.18) : 0;
+  const releaseCount = Math.max(overflowRelease, blockedRelease, pressureRelease);
+  const minimumFeeders = Math.min(feeders.length, Math.max(2, Math.ceil(hungryLarvae.length * 0.45)));
+  const recommendedFeeders = congested ? Math.max(minimumFeeders, feeders.length - Math.max(1, releaseCount)) : feeders.length;
+
+  return {
+    congested,
+    feeders: feeders.length,
+    blocked: blockedFeeders.length,
+    blockedRatio,
+    recommendedFeeders,
+  };
+}
+
 function aiManageFeeders(enemyWorkers, targets) {
   const colony = colonies.enemy;
   const hill = queenHomeHill("enemy");
   if (!hill) return;
 
   const enemyLarvae = countLarvae("enemy");
-  let feeders = enemyWorkers.filter((worker) => worker.state === "feeding_larvae");
-  const workerReserve =
-    colony.protein < 4 ? Math.max(2, Math.ceil(enemyWorkers.length * 0.35)) : Math.max(1, Math.floor(enemyWorkers.length * 0.12));
-  const feederLimit = Math.max(0, Math.min(Math.floor(enemyWorkers.length * targets.feederShare), enemyWorkers.length - workerReserve));
-  const neededFeeders = enemyLarvae > 0 && colony.protein > 0 ? Math.min(feederLimit, Math.max(5, Math.ceil(enemyLarvae * 0.95))) : 0;
-
-  if (feeders.length > neededFeeders) {
-    feeders
-      .slice(neededFeeders)
-      .forEach((worker) => releaseAIWorker(worker));
+  let feeders = feedingWorkersForHill("enemy", hill, enemyWorkers);
+  const congestion = feedingCongestionFor("enemy", hill, feeders);
+  if (congestion.congested) {
+    hill.feedCongestionUntil = game.elapsed + LARVA_FEED_CONGESTION_COOLDOWN;
+    hill.feedCongestionFeederCap = congestion.recommendedFeeders;
+  } else if (hill.feedCongestionUntil <= game.elapsed) {
+    hill.feedCongestionFeederCap = Infinity;
   }
 
-  feeders = enemyWorkers.filter((worker) => worker.state === "feeding_larvae");
+  const workerReserve =
+    game.elapsed < AI_GROWTH_ONLY_TIME
+      ? Math.max(3, Math.ceil(enemyWorkers.length * 0.36))
+      : colony.protein < 4
+        ? Math.max(3, Math.ceil(enemyWorkers.length * 0.32))
+        : Math.max(2, Math.floor(enemyWorkers.length * 0.12));
+  const feederLimit = Math.max(0, Math.min(Math.floor(enemyWorkers.length * targets.feederShare), enemyWorkers.length - workerReserve));
+  const feederNeed = game.elapsed < AI_GROWTH_ONLY_TIME ? Math.ceil(enemyLarvae * 0.8) : Math.max(4, Math.ceil(enemyLarvae * 0.95));
+  let neededFeeders = enemyLarvae > 0 && colony.protein > 0 ? Math.min(feederLimit, feederNeed) : 0;
+  if (hill.feedCongestionUntil > game.elapsed) {
+    neededFeeders = Math.min(neededFeeders, hill.feedCongestionFeederCap);
+  }
+
+  if (feeders.length > neededFeeders) {
+    releaseFeedingWorkers(feeders, feeders.length - neededFeeders);
+  }
+
+  feeders = feedingWorkersForHill("enemy", hill, enemyWorkers);
   if (feeders.length >= neededFeeders) return;
 
   const candidates = enemyWorkers
@@ -3040,7 +3229,9 @@ function aiManageBuilders(enemyWorkers, targets) {
   const needsExpansion = hill.level < targets.hillLevel;
   const hasBuildCost = colony.sand >= BUILD_COST.sand && colony.sticks >= BUILD_COST.sticks;
   const desiredBuilders =
-    needsExpansion && hasBuildCost ? Math.min(8, Math.max(3, Math.floor(enemyWorkers.length * 0.3))) : 0;
+    needsExpansion && hasBuildCost
+      ? Math.min(targets.builderMax, Math.max(targets.builderMin, Math.floor(enemyWorkers.length * targets.builderShare)))
+      : 0;
 
   if (builders.length > desiredBuilders) {
     builders
@@ -3085,11 +3276,20 @@ function aiManageGatherers(enemyWorkers, targets) {
     const carryingMaterial = worker.carryKind === "sand" || worker.carryKind === "sticks";
     return isGathering && (materialPreference || carryingMaterial);
   }).length;
-  const desiredProteinGatherers = needsProtein ? Math.min(16, Math.max(3, Math.ceil(enemyWorkers.length * 0.45))) : 0;
-  const desiredMaterialGatherers = needsMaterials ? Math.min(14, Math.max(3, Math.ceil(enemyWorkers.length * targets.materialShare))) : 1;
+  const desiredProteinGatherers = needsProtein ? Math.min(24, Math.max(2, Math.ceil(enemyWorkers.length * 0.5))) : 0;
+  const desiredMaterialGatherers = needsMaterials ? Math.min(14, Math.max(1, Math.ceil(enemyWorkers.length * targets.materialShare))) : 0;
 
   const idleWorkers = enemyWorkers.filter((worker) => worker.state === "idle" || worker.state === "moving");
   for (const worker of idleWorkers) {
+    const hasCoreProteinCrew = proteinGatherers >= Math.max(1, desiredProteinGatherers - 1);
+    if (needsMaterials && hasCoreProteinCrew && materialGatherers < desiredMaterialGatherers) {
+      if (aiOrderGather(worker, "materials")) {
+        if (worker.gatherPreference === "materials" || worker.gatherPreference === "sand" || worker.gatherPreference === "sticks") {
+          materialGatherers += 1;
+        }
+        continue;
+      }
+    }
     if (needsProtein && proteinGatherers < desiredProteinGatherers) {
       if (aiOrderGather(worker, "protein")) {
         proteinGatherers += 1;
@@ -3108,22 +3308,60 @@ function aiManageGatherers(enemyWorkers, targets) {
   }
 }
 
-function aiStagePoint(index, total, hill) {
+function aiStageCenters(hill) {
+  const queen = nearestQueen("enemy", hill.x, hill.y);
   const playerHill = nearestAnthill("player", hill.x, hill.y);
-  const towardPlayer = playerHill && game.elapsed >= 180;
-  const centerX = towardPlayer ? hill.x * 0.76 + playerHill.x * 0.24 : hill.x;
-  const centerY = towardPlayer ? hill.y * 0.76 + playerHill.y * 0.24 : hill.y;
-  return spreadPoint(index, total, centerX, centerY);
+  const guardCenter = queen ? { x: queen.x, y: queen.y } : queenChamberPoint(hill);
+  if (!playerHill || game.elapsed < AI_GROWTH_ONLY_TIME) {
+    return [guardCenter, { x: hill.x + 54, y: hill.y - 34 }, { x: hill.x + 54, y: hill.y + 34 }];
+  }
+
+  const dx = playerHill.x - hill.x;
+  const dy = playerHill.y - hill.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const nx = dx / length;
+  const ny = dy / length;
+  const px = -ny;
+  const py = nx;
+  const forward = game.elapsed >= AI_ATTACK_READY_TIME ? 460 : 320;
+  const flank = 170;
+
+  return [
+    guardCenter,
+    {
+      x: clamp(hill.x + nx * forward + px * flank, 20, WORLD.width - 20),
+      y: clamp(hill.y + ny * forward + py * flank, 20, WORLD.height - 20),
+    },
+    {
+      x: clamp(hill.x + nx * (forward + 70) - px * flank, 20, WORLD.width - 20),
+      y: clamp(hill.y + ny * (forward + 70) - py * flank, 20, WORLD.height - 20),
+    },
+  ];
+}
+
+function aiStagePoint(index, total, hill) {
+  const centers = aiStageCenters(hill);
+  const group = index % centers.length;
+  const groupIndex = Math.floor(index / centers.length);
+  const groupTotal = Math.max(1, Math.ceil((total - group) / centers.length));
+  return spreadPoint(groupIndex, groupTotal, centers[group].x, centers[group].y);
 }
 
 function aiManageFighters(enemyFighters) {
   const hill = queenHomeHill("enemy");
   if (!hill) return;
+  const centers = aiStageCenters(hill);
 
   for (const [index, fighter] of enemyFighters.entries()) {
     if (fighter.state === "attacking") continue;
+    const group = index % centers.length;
+    const stagePoint = aiStagePoint(index, Math.max(1, enemyFighters.length), hill);
     const threat = findNearestEnemy(fighter, 560);
-    if (threat && dist(threat.x, threat.y, hill.x, hill.y) < 620) {
+    const defensiveThreat =
+      threat &&
+      (dist(threat.x, threat.y, hill.x, hill.y) < 620 ||
+        dist(threat.x, threat.y, stagePoint.x, stagePoint.y) < (group === 0 ? 420 : 320));
+    if (defensiveThreat) {
       fighter.state = "attacking";
       fighter.targetId = threat.id;
       fighter.target = null;
@@ -3133,7 +3371,7 @@ function aiManageFighters(enemyFighters) {
     }
     if (fighter.state !== "idle") continue;
     fighter.state = "moving";
-    fighter.target = aiStagePoint(index, Math.max(1, enemyFighters.length), hill);
+    fighter.target = stagePoint;
     fighter.targetId = null;
     fighter.keepGathering = false;
     fighter.attackMoveTarget = null;
@@ -3150,7 +3388,9 @@ function aiLaunchWave(enemyFighters, targets) {
   const target = nearestQueen("player");
   if (!target) return;
   const available = enemyFighters
-    .filter((fighter) => fighter.state !== "attacking")
+    .map((fighter, index) => ({ fighter, group: index % 3 }))
+    .filter((entry) => entry.group !== 0 && entry.fighter.state !== "attacking")
+    .map((entry) => entry.fighter)
     .sort((a, b) => dist(a.x, a.y, target.x, target.y) - dist(b.x, b.y, target.x, target.y));
 
   if (enemyFighters.length < targets.attackMinFighters || available.length < Math.min(8, targets.attackMinFighters)) {
@@ -3187,6 +3427,7 @@ function updateAI(dt) {
   const enemyWorkers = units.filter((unit) => unit.team === "enemy" && unit.type === "worker" && unit.hp > 0);
   const enemyFighters = units.filter((unit) => unit.team === "enemy" && unit.type === "fighter" && unit.hp > 0);
 
+  aiManageQueenDefense(enemyWorkers);
   aiManageQueenServants(enemyWorkers, targets);
   aiManageLarvae(targets);
   aiManageFeeders(enemyWorkers, targets);
