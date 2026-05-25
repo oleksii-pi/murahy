@@ -3408,10 +3408,7 @@ function appendIdleWorkerButton() {
   chip.type = "button";
   chip.className = "selection-chip";
   chip.textContent = `Select ${idleWorkers.length} idle workers`;
-  chip.addEventListener("click", (event) => {
-    event.stopPropagation();
-    selectIdleWorkers();
-  });
+  activateButtonOnPointerDown(chip, selectIdleWorkers);
   row.appendChild(chip);
   ui.selectionDetail.appendChild(row);
 }
@@ -3488,10 +3485,7 @@ function renderSelectionPanel() {
     chip.type = "button";
     chip.className = `selection-chip${activeType === type ? " active" : ""}`;
     chip.textContent = `${count} ${unitTypeLabel(type, count)}`;
-    chip.addEventListener("click", (event) => {
-      event.stopPropagation();
-      selectOnlySelectedType(type);
-    });
+    activateButtonOnPointerDown(chip, () => selectOnlySelectedType(type));
     row.appendChild(chip);
   }
   ui.selectionDetail.appendChild(row);
@@ -3521,12 +3515,7 @@ function renderHud() {
   renderSelectionPanel();
 }
 
-function button(label, cost, disabled, onClick) {
-  const element = document.createElement("button");
-  element.className = "action-button";
-  element.type = "button";
-  element.disabled = Boolean(disabled) || game.status !== "playing";
-  element.innerHTML = cost ? `${label}<span class="cost">${cost}</span>` : label;
+function activateButtonOnPointerDown(element, onClick) {
   let activatedByPointer = false;
   element.addEventListener("pointerdown", (event) => {
     if (element.disabled) return;
@@ -3542,7 +3531,24 @@ function button(label, cost, disabled, onClick) {
     }
     onClick();
   });
+}
+
+function button(label, cost, disabled, onClick) {
+  const element = document.createElement("button");
+  element.className = "action-button";
+  element.type = "button";
+  element.disabled = Boolean(disabled) || game.status !== "playing";
+  element.innerHTML = cost ? `${label}<span class="cost">${cost}</span>` : label;
+  activateButtonOnPointerDown(element, onClick);
   return element;
+}
+
+function currentActionContextSignature(selection, tunnel, hill) {
+  return JSON.stringify({
+    selectedIds: selection.map((unit) => unit.id).sort((a, b) => a - b),
+    tunnelId: tunnel?.id ?? null,
+    hillId: hill?.id ?? null,
+  });
 }
 
 function renderActions() {
@@ -3618,7 +3624,10 @@ function renderActions() {
   }
 
   const signature = JSON.stringify(
-    actions.map((action) => [action.label, action.cost, Boolean(action.disabled), game.status, game.rallyMode, game.tunnelMode, game.attackMoveMode]),
+    [
+      currentActionContextSignature(selection, tunnel, hill),
+      actions.map((action) => [action.label, action.cost, Boolean(action.disabled), game.status, game.rallyMode, game.tunnelMode, game.attackMoveMode]),
+    ],
   );
   if (signature === game.actionSignature) return;
   game.actionSignature = signature;
