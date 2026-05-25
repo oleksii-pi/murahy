@@ -2812,6 +2812,7 @@ function aiTargets() {
     waveSize: 28,
     minWorkersBeforeFighters: 999,
     fighterProteinFloor: 999,
+    larvaeLayAttempts: 5,
   };
 
   if (time >= 40) {
@@ -2836,29 +2837,45 @@ function aiTargets() {
     targets.cellBuffer = LARVAE_BATCH_SIZE * 3;
     targets.minWorkersBeforeFighters = 44;
     targets.fighterProteinFloor = 10;
+    targets.larvaeLayAttempts = 6;
   }
   if (time >= 300) {
-    targets.fighters = Math.max(targets.fighters, 42);
-    targets.hillLevel = 7;
-    targets.minWorkersBeforeFighters = 50;
-    targets.fighterProteinFloor = 8;
+    targets.fighters = Math.max(targets.fighters, 126);
+    targets.hillLevel = 9;
+    targets.feederShare = 0.82;
+    targets.materialShare = 0.26;
+    targets.queenServants = 7;
+    targets.builderShare = 0.3;
+    targets.builderMax = 12;
+    targets.cellBuffer = LARVAE_BATCH_SIZE * 5;
+    targets.minWorkersBeforeFighters = 46;
+    targets.fighterProteinFloor = 2;
+    targets.larvaeLayAttempts = 10;
   }
   if (time >= 420) {
-    targets.fighters = Math.max(targets.fighters, 60);
-    targets.hillLevel = 8;
-    targets.minWorkersBeforeFighters = 54;
-    targets.fighterProteinFloor = 6;
+    targets.fighters = Math.max(targets.fighters, 180);
+    targets.hillLevel = 11;
+    targets.feederShare = 0.84;
+    targets.materialShare = 0.28;
+    targets.builderMax = 14;
+    targets.cellBuffer = LARVAE_BATCH_SIZE * 6;
+    targets.minWorkersBeforeFighters = 48;
+    targets.fighterProteinFloor = 1;
+    targets.larvaeLayAttempts = 12;
   }
   if (time >= AI_ATTACK_READY_TIME) {
     targets.workers = 70;
-    targets.fighters = 84 + waveGrowth;
-    targets.hillLevel = 8;
-    targets.feederShare = 0.8;
-    targets.materialShare = 0.18;
-    targets.attackMinFighters = 36 + Math.min(18, game.aiWave * 2);
-    targets.waveSize = 30 + Math.min(24, game.aiWave * 3);
-    targets.minWorkersBeforeFighters = 56;
-    targets.fighterProteinFloor = 5;
+    targets.fighters = 252 + waveGrowth * 3;
+    targets.hillLevel = 12;
+    targets.feederShare = 0.85;
+    targets.materialShare = 0.24;
+    targets.builderMax = 14;
+    targets.cellBuffer = LARVAE_BATCH_SIZE * 6;
+    targets.attackMinFighters = 72 + Math.min(36, game.aiWave * 4);
+    targets.waveSize = 60 + Math.min(48, game.aiWave * 6);
+    targets.minWorkersBeforeFighters = 50;
+    targets.fighterProteinFloor = 0.5;
+    targets.larvaeLayAttempts = 14;
   }
 
   return targets;
@@ -3082,7 +3099,8 @@ function aiManageLarvae(targets) {
   if (!queen || !hill || colony.protein < LARVA_LAY_PROTEIN_COST || queenPreparedCells(queen) < LARVAE_LAY_COUNT) return;
 
   let attempts = 0;
-  while (attempts < 5 && colony.protein >= LARVA_LAY_PROTEIN_COST && queenPreparedCells(queen) >= LARVAE_LAY_COUNT) {
+  const maxAttempts = targets.larvaeLayAttempts || 5;
+  while (attempts < maxAttempts && colony.protein >= LARVA_LAY_PROTEIN_COST && queenPreparedCells(queen) >= LARVAE_LAY_COUNT) {
     const hillLarvae = countLarvae("enemy", null, hill.id);
     if (anthillLarvaeCapacity(hill) - hillLarvae < LARVAE_LAY_COUNT) return;
     const currentWorkers = countUnits("enemy", "worker") + countLarvae("enemy", "worker");
